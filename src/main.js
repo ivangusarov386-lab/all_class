@@ -1,4 +1,4 @@
-import { EXPORT_URL, SHEET_URL, readReplacementWorkbook, teacherKey } from './replacements.js';
+import { EXPORT_URL, SHEET_URL, REPLACEMENT_DATA_VERSION, readReplacementWorkbook, teacherKey } from './replacements.js?v=3';
 import { dateKey, monthKey, dateInMonth, shiftMonth, monthGrid, monthOptions } from './calendar.js';
 
 const $ = selector => document.querySelector(selector);
@@ -11,10 +11,11 @@ const shortDate = key => fmt(new Date(key + 'T12:00:00'), { day: 'numeric', mont
 const plural = (n, one, few, many) => `${n} ${n % 100 >= 11 && n % 100 <= 14 ? many : n % 10 === 1 ? one : n % 10 >= 2 && n % 10 <= 4 ? few : many}`;
 const externalIcon = '<svg class="inline-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M7 17 17 7M7 7h10v10"/></svg>';
 const logoURL = new URL('../assets/school-emblem.svg', import.meta.url).href;
-const empty = () => ({ version: 2, entries: [], unresolved: [], coverage: [], sheets: [], stats: {} });
+const CACHE_KEY = `school-replacements-v${REPLACEMENT_DATA_VERSION}`;
+const empty = () => ({ version: REPLACEMENT_DATA_VERSION, entries: [], unresolved: [], coverage: [], sheets: [], stats: {} });
 let selected = today(), calendarOpen = false, data, snapshot = empty(), replacements = empty();
 let className = read('school-class', '9Ц'), origin = 'snapshot', busy = false, failure = '', importMessage = '';
-const validDataset = value => value?.version === 2 && Array.isArray(value.entries) && Array.isArray(value.unresolved) && Array.isArray(value.coverage);
+const validDataset = value => value?.version === REPLACEMENT_DATA_VERSION && Array.isArray(value.entries) && Array.isArray(value.unresolved) && Array.isArray(value.coverage);
 
 function move(days) { selected.setDate(selected.getDate() + days); render(); }
 function selectDate(key) {
@@ -147,7 +148,7 @@ function render() {
   $('#settings').onclick = $('#details').onclick = () => $('#source-dialog').showModal();
   $('#close-dialog').onclick = () => $('#source-dialog').close();
   $('#refresh').onclick = () => sync(); $('#import-file').onchange = importFile;
-  $('#clear').onclick = () => { replacements = snapshot; origin = 'snapshot'; failure = ''; save('school-replacements-v2', null); importMessage = 'Локальный импорт сброшен. Показана школьная таблица.'; render(); };
+  $('#clear').onclick = () => { replacements = snapshot; origin = 'snapshot'; failure = ''; save(CACHE_KEY, null); importMessage = 'Локальный импорт сброшен. Показана школьная таблица.'; render(); };
   let touch;
   $('.calendar').addEventListener('touchstart', event => { touch = event.changedTouches[0]; }, { passive: true });
   $('.calendar').addEventListener('touchend', event => { const point = event.changedTouches[0]; if (touch && Math.abs(point.clientX - touch.clientX) > 70 && Math.abs(point.clientY - touch.clientY) < 60) { const direction = point.clientX < touch.clientX ? 1 : -1; if (calendarOpen) moveMonth(direction); else move(direction); } }, { passive: true });
@@ -179,7 +180,7 @@ async function importFile(event) {
     const result = await readReplacementWorkbook(await file.arrayBuffer(), data);
     if (!result.entries.length && !result.unresolved.some(row => data.classes[row.className])) throw Error('В файле нет замен для классов основного расписания.');
     replacements = result; origin = 'file'; failure = ''; importMessage = 'Файл загружен. Записи для проверки отмечены в соответствующих днях.';
-    save('school-replacements-v2', { ...result, origin }); render();
+    save(CACHE_KEY, { ...result, origin }); render();
   } catch (error) { importMessage = error.message; if ($('#import-status')) $('#import-status').textContent = importMessage; }
 }
 
@@ -192,7 +193,7 @@ async function sync({ quiet = false } = {}) {
     const result = await readReplacementWorkbook(await response.arrayBuffer(), data);
     // A user's manual import made while the network request was pending wins.
     if (quiet && origin === 'file') return;
-    replacements = result; origin = 'google'; save('school-replacements-v2', { ...result, origin });
+    replacements = result; origin = 'google'; save(CACHE_KEY, { ...result, origin });
   } catch { if (!quiet || origin !== 'file') failure = 'Таблица временно недоступна'; }
   finally { busy = false; render(); }
 }
@@ -203,11 +204,14 @@ async function init() {
     if (!response.ok) throw Error();
     data = await response.json();
     try {
-      const response = await fetch(new URL('../data/replacements.json', import.meta.url));
+      const response = await fetch(new URL('../data/replacements.json', import.meta.url), { cache: 'no-store' });
       const result = response.ok ? await response.json() : null;
       if (validDataset(result)) snapshot = result;
     } catch {}
-    const cached = read('school-replacements-v2', null);
+    const cached = read(CACHE_KEY, null);
+    if (!cached && read('school-replacements-v2', null)?.origin === 'file') {
+      importMessage = 'Старый локальный импорт не используется из-за ошибки дат. Показана школьная таблица; при необходимости загрузите свой файл заново.';
+    }
     if (validDataset(cached) && (cached.origin === 'file' || (Date.parse(cached.fetchedAt) || 0) > (Date.parse(snapshot.fetchedAt) || 0))) {
       replacements = cached; origin = cached.origin === 'file' ? 'file' : 'google';
     } else replacements = snapshot;

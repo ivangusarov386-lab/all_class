@@ -1,5 +1,7 @@
 export const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1vIOpBDYYJlVAnTNHKAvS8YBsIMK8wjV6HU3EACIqJSs/edit';
 export const EXPORT_URL = SHEET_URL.replace('/edit', '/export?format=xlsx');
+// V2 caches may contain dates shifted by the browser's historical timezone offset.
+export const REPLACEMENT_DATA_VERSION = 3;
 const clean = value => String(value ?? '').trim();
 const folded = value => clean(value).toLowerCase().replace(/ё/g, 'е');
 const headerKey = value => folded(value).replace(/[^а-яa-z0-9№]/g, '');
@@ -13,8 +15,8 @@ export function normalizeDate(value) {
   let parts = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (parts) {
     const [, year, month, day] = parts;
-    const date = new Date(+year, +month - 1, +day);
-    return date.getFullYear() === +year && date.getMonth() === +month - 1 && date.getDate() === +day ? text : null;
+    const date = new Date(Date.UTC(+year, +month - 1, +day));
+    return date.getUTCFullYear() === +year && date.getUTCMonth() === +month - 1 && date.getUTCDate() === +day ? text : null;
   }
   parts = text.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
   return parts ? normalizeDate(`${parts[3]}-${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}`) : null;
@@ -232,7 +234,7 @@ export function connectReplacementSheets(sheets, schedule, { fetchedAt = new Dat
   });
   entries.sort((a, b) => a.date.localeCompare(b.date) || a.className.localeCompare(b.className, 'ru') || a.lesson - b.lesson);
   return {
-    version: 2, sourceUrl: SHEET_URL, fetchedAt,
+    version: REPLACEMENT_DATA_VERSION, sourceUrl: SHEET_URL, fetchedAt,
     sheets: sheets.map(sheet => sheet.name), sheetReports, coverage: [...coverage].sort(), entries, unresolved,
     stats: { sourceRows, duplicateRows, duplicateLessons, outsideSchedule, matchedLessons: entries.length, unresolved: unresolved.length },
   };
@@ -242,9 +244,24 @@ export async function readReplacementWorkbook(buffer, schedule, options = {}) {
   const XLSX = await import('../vendor/xlsx.js');
   const bytes = new Uint8Array(buffer);
   const binary = (bytes[0] === 0x50 && bytes[1] === 0x4b) || (bytes[0] === 0xd0 && bytes[1] === 0xcf);
-  const workbook = binary ? XLSX.read(buffer, { type: 'array', cellDates: true })
-    : XLSX.read(new TextDecoder('utf-8', { fatal: true }).decode(buffer), { type: 'string', raw: true, cellDates: true });
-  const sheets = workbook.SheetNames.map(name => ({ name, rows: XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, defval: '' }) }));
+  // Keep Excel serial dates as numbers. Converting them through JS Date can move
+  // midnight to the previous day in browsers with historical offsets in seconds.
+  const workbook = binary ? XLSX.read(buffer, { type: 'array', cellDates: false })
+    : XLSX.read(new TextDecoder('utf-8', { fatal: true }).decode(buffer), { type: 'string', raw: true, cellDates: false });
+  const date1904 = !!workbook.Workbook?.WBProps?.date1904;
+  const sheets = workbook.SheetNames.map(name => {
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, defval: '', raw: true });
+    const { index, columns } = findHeader(rows);
+    for (let row = index + 1; row < rows.length; row++) {
+      const value = rows[row][columns.date];
+      if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+      const parts = XLSX.SSF.parse_date_code(value, { date1904 });
+      rows[row][columns.date] = parts
+        ? `${String(parts.y).padStart(4, '0')}-${String(parts.m).padStart(2, '0')}-${String(parts.d).padStart(2, '0')}`
+        : '';
+    }
+    return { name, rows };
+  });
   const result = connectReplacementSheets(sheets, schedule, options);
   if (!result.stats.sourceRows) throw Error('В файле нет записей замен. Сохранённые данные оставлены.');
   return result;

@@ -152,3 +152,21 @@ test('real workbook inventory includes September, October and November with copi
   assert(data.sheetReports[2].monthCounts['2026-11'] > 0);
   assert(data.sheetReports[2].otherMonthRows > 0);
 });
+
+test('the reported 6М replacement keeps November 5 for numeric Excel dates in both date systems', async () => {
+  const { missingReplacementWorkbook } = await import('./fixtures/missing-replacement.js');
+  for (const options of [{}, { date1904: true }, { fraction: 0.75 }]) {
+    const data = await readReplacementWorkbook(missingReplacementWorkbook(options), schedule);
+    assert.equal(data.version, 3);
+    assert.equal(data.unresolved.length, 0);
+    assert.equal(data.entries.length, 1);
+    const [entry] = data.entries;
+    assert.equal(entry.date, '2026-11-05');
+    assert.equal(entry.className, '6М');
+    assert.equal(entry.lesson, 4);
+    assert.equal(entry.teacher, 'Шурухина О.С.');
+    assert.equal(entry.room, '2.24');
+    assert.deepEqual(entry.targetTeachers, ['Попова Ю.Н.']);
+    assert.deepEqual(data.coverage, ['2026-11-05']);
+  }
+});

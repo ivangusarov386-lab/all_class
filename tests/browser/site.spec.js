@@ -65,7 +65,7 @@ test('works on a narrow phone screen', async ({ page }) => {
 });
 
 test('shows a useful message if the app module fails to load', async ({ page }) => {
-  await page.route(/\/(?:src\/main\.js|assets\/main-[^/]+\.js)$/, route => route.abort());
+  await page.route(/\/(?:src\/main\.js|assets\/main-[^/]+\.js)(?:\?.*)?$/, route => route.abort());
   await page.goto('./');
   await expect(page.getByRole('alert')).toContainText('Не удалось открыть расписание');
   await expect(page.getByRole('link', { name: 'Перезагрузить страницу' })).toBeVisible();
@@ -201,4 +201,68 @@ test('phone date grid stays within the screen and empty future months do not cla
   await expect(page.locator('.month-data-note')).toContainText('пока нет записей');
   await expect(page.locator('.month-grid .replacement-marker')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+for (const timezone of ['Europe/Moscow', 'America/New_York', 'Asia/Kathmandu']) {
+  test.describe(`Excel calendar dates in ${timezone}`, () => {
+    test.use({ timezoneId: timezone });
+    test('keeps the reported 6М replacement on November 5 even with historical offset seconds', async ({ page }) => {
+      const { missingReplacementWorkbook } = await import('../fixtures/missing-replacement.js');
+      await page.addInitScript(() => {
+        const NativeDate = Date;
+        // Historical timezone databases may include seconds at Excel's 1899 epoch.
+        class HistoricalDate extends NativeDate {
+          constructor(...args) {
+            super(...args);
+            if (args.length >= 3 && args[0] === 1899 && args[1] === 11 && args[2] === 30) this.setTime(this.getTime() - 17000);
+          }
+        }
+        window.Date = HistoricalDate;
+      });
+      await page.route('https://docs.google.com/spreadsheets/d/**/export?format=xlsx', route => route.fulfill({
+        status: 200, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', body: missingReplacementWorkbook(),
+      }));
+      await page.goto('./');
+      await expect(page.locator('#sync-status')).toContainText('Google Таблицы');
+      await page.selectOption('#grade', '6');
+      await page.selectOption('#class-select', '6М');
+      await page.selectOption('#month-select', '2026-11');
+      await page.locator('#calendar-day-2026-11-05').click();
+      const fourth = page.locator('.lesson').filter({ has: page.locator('.lesson-number', { hasText: /^4$/ }) });
+      await expect(fourth.locator('.replacement p')).toContainText('Шурухина О.С. · Каб. 2.24');
+      await expect(fourth.locator('.crossed p')).toContainText('Попова Ю.Н.');
+      await expect(page.locator('.coverage-note')).toHaveCount(0);
+      const cache = await page.evaluate(() => JSON.parse(localStorage.getItem('school-replacements-v3')));
+      expect(cache.coverage).toEqual(['2026-11-05']);
+      expect(cache.entries[0].date).toBe('2026-11-05');
+      await page.route('https://docs.google.com/spreadsheets/d/**/export?format=xlsx', route => route.abort('internetdisconnected'));
+      await page.reload();
+      await page.selectOption('#month-select', '2026-11');
+      await page.locator('#calendar-day-2026-11-05').click();
+      await expect(page.locator('.replacement p')).toContainText('Шурухина О.С.');
+      await page.locator('#prev').click();
+      await expect(page.locator('.replacement')).toHaveCount(0);
+    });
+  });
+}
+
+test('a newer legacy cache with shifted dates cannot hide the correct bundled replacement', async ({ page }) => {
+  const previous = JSON.parse(fs.readFileSync('data/replacements.json'));
+  previous.version = 2;
+  previous.origin = 'file';
+  previous.fetchedAt = '2099-01-01T00:00:00Z';
+  previous.coverage = ['2026-11-04'];
+  previous.entries = previous.entries.filter(row => row.className === '6М' && row.date === '2026-11-05').map(row => ({ ...row, date: '2026-11-04' }));
+  previous.unresolved = [];
+  await page.addInitScript(previous => {
+    localStorage.setItem('school-replacements-v2', JSON.stringify(previous));
+    localStorage.setItem('school-class', JSON.stringify('6М'));
+  }, previous);
+  await page.goto('./');
+  await expect(page.locator('#class-select')).toHaveValue('6М');
+  await page.selectOption('#month-select', '2026-11');
+  await page.locator('#calendar-day-2026-11-05').click();
+  await expect(page.locator('.replacement p')).toContainText('Шурухина О.С. · Каб. 2.24');
+  await expect(page.locator('.coverage-note')).toHaveCount(0);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('school-replacements-v2')))).toEqual(previous);
 });
