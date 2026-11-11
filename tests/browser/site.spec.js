@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import { rememberTestClass, chooseClass } from '../fixtures/class-profile.js';
+import { selectMonth, openSources } from '../fixtures/ui.js';
 
 test.beforeEach(async ({ page, baseURL }) => {
   await rememberTestClass(page, baseURL);
@@ -37,7 +38,7 @@ test('opens under the repository path with no build server or external dependenc
 
 test('imports a replacement from the local browser module and retains the original lesson', async ({ page }) => {
   await page.goto('./');
-  await page.locator('#settings').click();
+  await openSources(page);
   await expect(page.locator('a[download]')).toHaveAttribute('href', /replacement-template|data:text\/csv/);
   await page.locator('#import-file').setInputFiles({
     name: 'replacements.csv',
@@ -49,7 +50,7 @@ test('imports a replacement from the local browser module and retains the origin
   await expect(page.locator('.changed .crossed h3')).toHaveCSS('text-decoration-line', 'line-through');
   await page.reload();
   await expect(page.locator('.replacement h3')).toHaveText('Проверка замены');
-  await page.locator('#settings').click();
+  await openSources(page);
   await page.locator('#clear').click();
   await expect(page.locator('.replacement')).toHaveCount(0);
 });
@@ -101,7 +102,7 @@ test('unknown records remain visible and cancellation does not look like a teach
   await page.goto('./');
   await chooseClass(page, '7А');
   await expect(page.locator('.replacement h3').filter({ hasText: 'Урок отменён' })).toBeVisible();
-  await page.locator('#settings').click();
+  await openSources(page);
   await page.locator('#import-file').setInputFiles({
     name: 'unmatched.csv', mimeType: 'text/csv',
     buffer: Buffer.from('Дата;Класс;Урок;Предмет;Учитель;Кого заменяют\n05.11.2026;7А;;Физика;Тестовый учитель;Неизвестный А.А.\n'),
@@ -134,10 +135,10 @@ test('Google refresh reads the school schema and caches the result for a reload 
   await expect(page.locator('.replacement p').filter({ hasText: 'Учитель из Google' })).toHaveCount(2);
 });
 
-test('month selection opens a full grid above lessons and date selection opens real replacements', async ({ page }) => {
+test('month selection opens a modal calendar and date selection opens real replacements', async ({ page }) => {
   await page.goto('./');
   await expect(page.locator('#month-select')).toHaveValue('2026-11');
-  await page.selectOption('#month-select', '2026-09');
+  await selectMonth(page, '2026-09');
   await expect(page.locator('#toggle-calendar')).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('.month-day:not(.outside-month)')).toHaveCount(30);
   await expect(page.locator('#calendar-day-2026-09-25 .replacement-marker')).toBeVisible();
@@ -160,15 +161,16 @@ test('month selection opens a full grid above lessons and date selection opens r
 test('month and year navigation handle short months without skipping dates or losing the class', async ({ page }) => {
   await page.goto('./');
   await chooseClass(page, '11Ш');
-  await page.selectOption('#month-select', '2026-01');
+  await selectMonth(page, '2026-01');
   await page.locator('#calendar-day-2026-01-31').click();
-  await page.selectOption('#month-select', '2026-02');
+  await selectMonth(page, '2026-02');
   await expect(page.locator('.calendar h2')).toContainText('28 февраля');
   await expect(page.locator('.month-day:not(.outside-month)')).toHaveCount(28);
-  await page.selectOption('#month-select', '2026-01');
+  await selectMonth(page, '2026-01');
   await page.locator('#month-prev').click();
   await expect(page.locator('#month-select')).toHaveValue('2025-12');
   await expect(page.locator('.class-badge')).toHaveText('11Ш');
+  await page.locator('#close-calendar').click();
   await page.locator('#today').click();
   await expect(page.locator('#month-select')).toHaveValue('2026-11');
   await expect(page.locator('#month-panel')).toBeHidden();
@@ -177,7 +179,7 @@ test('month and year navigation handle short months without skipping dates or lo
 
 test('source details list all monthly sheets and distinguish copied dates from the sheet name', async ({ page }) => {
   await page.goto('./');
-  await page.locator('#settings').click();
+  await openSources(page);
   await expect(page.locator('.sheet-reports li')).toHaveCount(3);
   await expect(page.locator('.sheet-reports')).toContainText('1-30 сентября 2026');
   await expect(page.locator('.sheet-reports')).toContainText('1-30 октября 2026');
@@ -195,7 +197,7 @@ test('phone date grid stays within the screen and empty future months do not cla
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.locator('#calendar-day-2026-11-20').click();
   await expect(page.locator('.calendar h2')).toContainText('20 ноября');
-  await page.selectOption('#month-select', '2027-03');
+  await selectMonth(page, '2027-03');
   await expect(page.locator('.month-data-note')).toContainText('пока нет записей');
   await expect(page.locator('.month-grid .replacement-marker')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -223,7 +225,7 @@ for (const timezone of ['Europe/Moscow', 'America/New_York', 'Asia/Kathmandu']) 
       await page.goto('./');
       await expect(page.locator('#sync-status')).toContainText('Google Таблицы');
       await chooseClass(page, '6М');
-      await page.selectOption('#month-select', '2026-11');
+      await selectMonth(page, '2026-11');
       await page.locator('#calendar-day-2026-11-05').click();
       const fourth = page.locator('.lesson').filter({ has: page.locator('.lesson-number', { hasText: /^4$/ }) });
       await expect(fourth.locator('.replacement p')).toContainText('Шурухина О.С. · Каб. 2.24');
@@ -234,7 +236,7 @@ for (const timezone of ['Europe/Moscow', 'America/New_York', 'Asia/Kathmandu']) 
       expect(cache.entries[0].date).toBe('2026-11-05');
       await page.route('https://docs.google.com/spreadsheets/d/**/export?format=xlsx', route => route.abort('internetdisconnected'));
       await page.reload();
-      await page.selectOption('#month-select', '2026-11');
+      await selectMonth(page, '2026-11');
       await page.locator('#calendar-day-2026-11-05').click();
       await expect(page.locator('.replacement p')).toContainText('Шурухина О.С.');
       await page.locator('#prev').click();
@@ -258,7 +260,7 @@ test('a newer legacy cache with shifted dates cannot hide the correct bundled re
   }, previous);
   await page.goto('./');
   await expect(page.locator('.class-badge')).toHaveText('6М');
-  await page.selectOption('#month-select', '2026-11');
+  await selectMonth(page, '2026-11');
   await page.locator('#calendar-day-2026-11-05').click();
   await expect(page.locator('.replacement p')).toContainText('Шурухина О.С. · Каб. 2.24');
   await expect(page.locator('.coverage-note')).toHaveCount(0);

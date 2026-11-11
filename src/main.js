@@ -12,11 +12,13 @@ const shortDate = key => fmt(new Date(key + 'T12:00:00'), { day: 'numeric', mont
 const plural = (n, one, few, many) => `${n} ${n % 100 >= 11 && n % 100 <= 14 ? many : n % 10 === 1 ? one : n % 10 >= 2 && n % 10 <= 4 ? few : many}`;
 const externalIcon = '<svg class="inline-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M7 17 17 7M7 7h10v10"/></svg>';
 const logoURL = new URL('../assets/school-emblem.svg', import.meta.url).href;
+const brandHTML = () => `<img class="school-emblem" src="${logoURL}" alt="Герб школы" width="48" height="48"><span class="brand-copy"><span>Школьное расписание</span><span class="school-name">ЗилАрт 548</span></span>`;
 const CACHE_KEY = `school-replacements-v${REPLACEMENT_DATA_VERSION}`;
 const empty = () => ({ version: REPLACEMENT_DATA_VERSION, entries: [], unresolved: [], coverage: [], sheets: [], stats: {} });
 let selected = today(), calendarOpen = false, data, snapshot = empty(), replacements = empty();
 let className = '', setupGrade = '', setupClass = '', preferenceNotice = '';
 let origin = 'snapshot', busy = false, failure = '', importMessage = '';
+let sourcesUnlocked = false;
 const validDataset = value => value?.version === REPLACEMENT_DATA_VERSION && Array.isArray(value.entries) && Array.isArray(value.unresolved) && Array.isArray(value.coverage);
 
 function move(days) { selected.setDate(selected.getDate() + days); render(); }
@@ -27,12 +29,20 @@ function selectDate(key) {
 }
 function changeMonth(key) { selected = dateInMonth(selected, key); calendarOpen = true; render(); }
 function moveMonth(delta) { selected = shiftMonth(selected, delta); calendarOpen = true; render(); }
+function closeCalendar() {
+  calendarOpen = false; render();
+  $('#toggle-calendar').focus({ preventScroll: true });
+}
 
-function monthPanelHTML(counts) {
+function monthOptionsHTML(months) {
+  return months.map(month => `<option value="${month}" ${month === monthKey(selected) ? 'selected' : ''}>${esc(fmt(new Date(month + '-01T12:00:00'), { month: 'long', year: 'numeric' }).replace(' г.', ''))}</option>`).join('');
+}
+
+function monthPanelHTML(counts, months) {
   const selectedKey = dateKey(selected), currentKey = dateKey(today());
   const monthLabel = fmt(selected, { month: 'long', year: 'numeric' }).replace(' г.', '');
   const hasSourceData = replacements.coverage.some(key => key.startsWith(monthKey(selected)));
-  return `<div class="month-panel-heading"><span>Выберите дату</span><div class="month-controls"><button id="month-prev" aria-label="Предыдущий месяц">←</button><button id="month-next" aria-label="Следующий месяц">→</button></div></div>
+  return `<div class="month-panel-heading"><div class="field month-field"><label class="sr-only" for="calendar-month">Месяц и год</label><select id="calendar-month">${monthOptionsHTML(months)}</select></div><div class="month-controls"><button id="month-prev" aria-label="Предыдущий месяц">←</button><button id="month-next" aria-label="Следующий месяц">→</button></div></div>
     <div class="month-weekdays" aria-hidden="true">${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(day => `<span>${day}</span>`).join('')}</div>
     <div class="month-grid" role="group" aria-label="Даты: ${esc(monthLabel)}">${monthGrid(selected).map(cell => {
       const count = counts.get(cell.key) || { changes: 0, pending: 0 };
@@ -54,7 +64,7 @@ function sheetReportsHTML() {
 function renderClassSetup(classes) {
   const grades = [...new Set(classes.map(name => parseInt(name)))];
   $('#app').innerHTML = `
-    <div class="page setup-background"><header class="topbar"><a href="./" class="brand"><img class="school-emblem" src="${logoURL}" alt="Герб школы" width="48" height="48"> Школьное расписание</a></header></div>
+    <div class="page setup-background"><header class="topbar"><a href="./" class="brand">${brandHTML()}</a></header></div>
     <dialog id="class-dialog" class="class-setup" aria-labelledby="class-setup-title" aria-describedby="class-setup-description">
       <img class="setup-emblem" src="${logoURL}" alt="" width="64" height="64">
       <h2 id="class-setup-title">Выберите свой класс</h2>
@@ -94,6 +104,7 @@ function resetClass() {
   forgetClass();
   try { localStorage.removeItem('school-class'); } catch {}
   className = ''; setupGrade = ''; setupClass = ''; preferenceNotice = '';
+  sourcesUnlocked = false;
   selected = today(); calendarOpen = false;
   render();
   window.scrollTo({ top: 0, behavior: 'instant' });
@@ -114,6 +125,9 @@ function render() {
     return;
   }
   const dialogOpen = $('#source-dialog')?.open;
+  const accessOpen = $('#access-dialog')?.open;
+  const passwordValue = $('#source-password')?.value || '';
+  const passwordError = $('#password-error')?.textContent || '';
   const focused = document.activeElement?.id;
   const sourceMonths = [...new Set([...replacements.coverage.map(key => key.slice(0, 7)), ...(replacements.sheetReports || []).map(report => report.declaredMonth).filter(Boolean)])];
   const months = monthOptions(today(), selected, sourceMonths);
@@ -141,19 +155,18 @@ function render() {
   $('#app').innerHTML = `
     <div class="page">
       <header class="topbar">
-        <a href="./" class="brand"><img class="school-emblem" src="${logoURL}" alt="Герб школы" width="48" height="48"> Школьное расписание</a>
-        <button class="text-button" id="settings">Источники ${externalIcon}</button>
+        <a href="./" class="brand">${brandHTML()}</a>
       </header>
       <main>
         <section class="hero"><div class="class-badge" aria-label="Выбранный класс ${esc(className)}">${esc(className)}</div><div class="hero-copy"><p>Все уроки под рукой</p><h1 id="class-profile-heading" tabindex="-1">Твой учебный день.</h1><p class="subtitle">Расписание твоего класса с учётом замен.</p></div></section>
         <section class="calendar">
-          <div class="calendar-toolbar"><div class="field month-field"><label class="sr-only" for="month-select">Месяц расписания</label><select id="month-select">${months.map(month => `<option value="${month}" ${month === monthKey(selected) ? 'selected' : ''}>${esc(fmt(new Date(month + '-01T12:00:00'), { month: 'long', year: 'numeric' }).replace(' г.', ''))}</option>`).join('')}</select></div><button id="toggle-calendar" class="calendar-toggle" aria-label="${calendarOpen ? 'Скрыть календарь' : 'Открыть календарь'}" aria-controls="month-panel" aria-expanded="${calendarOpen}"><svg class="inline-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18"/></svg> Даты <span aria-hidden="true">${calendarOpen ? '⌃' : '⌄'}</span></button></div>
+          <div class="calendar-toolbar"><div class="field month-field"><label class="sr-only" for="month-select">Месяц расписания</label><select id="month-select">${monthOptionsHTML(months)}</select></div></div>
           <div class="calendar-heading"><div><h2>${isToday ? 'Сегодня' : esc(fmt(selected, { weekday: 'long' }))}<span class="date-label">${shortDate(key)}</span></h2></div><div class="day-controls"><button id="today">Сегодня</button><button id="prev" aria-label="Предыдущий день">←</button><button id="next" aria-label="Следующий день">→</button></div></div>
-          <div id="month-panel" class="month-panel" ${calendarOpen ? '' : 'hidden'}>${calendarOpen ? monthPanelHTML(dayCounts) : ''}</div>
-          <div class="week" aria-label="Дни недели" ${calendarOpen ? 'hidden' : ''}>${calendarOpen ? '' : Array.from({ length: 7 }, (_, index) => {
+          <div class="week" aria-label="Дни недели">${Array.from({ length: 7 }, (_, index) => {
             const date = new Date(week); date.setDate(date.getDate() + index);
             return `<button data-date="${dateKey(date)}" aria-pressed="${dateKey(date) === key}" class="week-day ${dateKey(date) === key ? 'selected' : ''} ${dateKey(date) === dateKey(today()) ? 'is-today' : ''}"><span>${fmt(date, { weekday: 'short' })}</span><strong>${date.getDate()}</strong><i></i></button>`;
           }).join('')}</div>
+          <div class="calendar-action"><button id="toggle-calendar" class="calendar-toggle" aria-haspopup="dialog" aria-controls="calendar-dialog" aria-expanded="${calendarOpen}"><svg class="inline-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18"/></svg> Открыть календарь</button></div>
           <div class="schedule-meta"><div class="schedule-summary"><span class="selected-class">${esc(className)} класс</span><span>${numbers.length ? plural(numbers.length, 'урок', 'урока', 'уроков') : 'Нет занятий'}</span></div><span class="change-tag ${changes.length ? 'has-changes' : ''}">${badge}</span></div>
           ${coverageNote ? `<div class="coverage-note" role="status"><p>${esc(coverageNote)}</p>${lastDate && lastDate !== key ? `<button id="last-changes">Последние записи для класса: ${shortDate(lastDate)}</button>` : ''}</div>` : ''}
           ${pending.length ? `<section class="unmatched"><h3>Нужно уточнить ${plural(pending.length, 'запись', 'записи', 'записей')}</h3><p>Эти замены есть в таблице, но пока не привязаны к конкретному занятию.</p><ul>${pending.map(row => `<li><strong>${row.lesson ? row.lesson + ' урок · ' : ''}${row.cancelled ? 'Отмена · ' : ''}${esc(row.subject || row.originalSubject || 'Предмет не указан')}</strong><span>${esc(row.teacher || 'Учитель не указан')}${row.room ? ' · Каб. ' + esc(row.room) : ''}</span><span>${esc(row.reason)}</span><small>${esc(row.source?.sheet)} · строка ${esc(row.source?.row)}</small></li>`).join('')}</ul></section>` : ''}
@@ -162,10 +175,24 @@ function render() {
         </section>
         <p class="source-note">Красным — замена, зачёркнуто — исходное занятие.${latest ? ' Последние записи в таблице: ' + shortDate(latest) + '.' : ''}<br>Время уроков — московское. Смахните влево или вправо, чтобы сменить день.</p>
         ${preferenceNotice ? `<p class="preference-notice" role="status">${esc(preferenceNotice)}</p>` : ''}
-        <footer><span>Учиться проще, когда всё по порядку.</span><div class="footer-actions"><button class="text-button" id="details">О расписании</button><button class="reset-class" id="reset-class" type="button">Сбросить класс</button></div></footer>
+        <footer><span>Учиться проще, когда всё по порядку.</span><div class="footer-actions"><button class="text-button" id="details">Для сотрудников</button><button class="reset-class" id="reset-class" type="button">Сбросить класс</button></div></footer>
       </main>
     </div>
-    <dialog id="source-dialog">
+    <dialog id="calendar-dialog" class="calendar-dialog" aria-labelledby="calendar-title" aria-describedby="calendar-description">
+      <div class="dialog-header"><h2 id="calendar-title">Календарь</h2><button id="close-calendar" aria-label="Закрыть календарь">×</button></div>
+      <p id="calendar-description">Выберите день, чтобы открыть расписание.</p>
+      <div id="month-panel" class="month-panel">${calendarOpen ? monthPanelHTML(dayCounts, months) : ''}</div>
+    </dialog>
+    <dialog id="access-dialog" class="access-dialog" aria-labelledby="access-title" aria-describedby="access-description">
+      <div class="dialog-header"><h2 id="access-title">Для сотрудников</h2><button id="close-access" aria-label="Закрыть вход">×</button></div>
+      <p id="access-description">Введите пароль, чтобы открыть настройки расписания.</p>
+      <form id="access-form">
+        <div class="field"><label for="source-password">Пароль</label><input id="source-password" name="password" type="password" autocomplete="off" required aria-describedby="password-error"></div>
+        <p id="password-error" class="password-error" role="alert" hidden></p>
+        <button class="setup-submit" type="submit">Открыть настройки</button>
+      </form>
+    </dialog>
+    ${sourcesUnlocked ? `<dialog id="source-dialog" aria-label="Источники расписания">
       <div class="dialog-header"><h2>Источники расписания</h2><button id="close-dialog" aria-label="Закрыть">×</button></div>
       <p>Основное расписание: ${classes.length} классов, понедельник — суббота. Загружено из вашей таблицы Excel.</p>
       <h3>Замены из Google Таблиц</h3>
@@ -181,27 +208,71 @@ function render() {
       <button id="clear" class="danger-button">Сбросить локальный импорт</button>
       ${review.length ? `<details class="source-review"><summary>Записи для проверки: ${esc(className)} и строки без класса (${review.length})</summary><p class="small">Показаны последние ${Math.min(30, review.length)} записей. Исправьте исходную строку в Google Таблице и обновите замены.</p><ul>${review.slice(0, 30).map(row => `<li><strong>${row.date ? shortDate(row.date) : 'Без даты'} · ${esc(row.sourceClass)}${row.lesson ? ' · ' + row.lesson + ' урок' : ''}</strong><span>${esc(row.subject || row.originalSubject)} · ${esc(row.teacher)}</span><span>${esc(row.reason)}</span><small>${esc(row.source?.sheet)} · строка ${esc(row.source?.row)}</small></li>`).join('')}</ul></details>` : ''}
       <details><summary>Особенности исходных таблиц</summary>${data.notes.map(note => `<p class="small">${esc(note)}</p>`).join('')}<p class="small">Даты берутся из строк, а не из названия листа. Повторы удаляются. При замене одной подгруппы зачёркивается только её учитель. Если кабинет не заполнен в таблице замен, приложение не подставляет его автоматически.</p></details>
-    </dialog>`;
+    </dialog>` : ''}`;
   document.querySelectorAll('[data-date]').forEach(button => button.onclick = () => selectDate(button.dataset.date));
   $('#month-select').onchange = event => changeMonth(event.target.value);
-  $('#toggle-calendar').onclick = () => { calendarOpen = !calendarOpen; render(); };
+  $('#toggle-calendar').onclick = () => { calendarOpen = true; render(); };
+  if ($('#calendar-month')) $('#calendar-month').onchange = event => changeMonth(event.target.value);
   if ($('#month-prev')) $('#month-prev').onclick = () => moveMonth(-1);
   if ($('#month-next')) $('#month-next').onclick = () => moveMonth(1);
-  $('#month-panel').onkeydown = event => { if (event.key === 'Escape') { calendarOpen = false; render(); $('#toggle-calendar').focus(); } };
+  $('#close-calendar').onclick = closeCalendar;
+  $('#calendar-dialog').oncancel = event => { event.preventDefault(); closeCalendar(); };
+  $('#calendar-dialog').onclick = event => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (event.target === event.currentTarget && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) closeCalendar();
+  };
   $('#prev').onclick = () => move(-1); $('#next').onclick = () => move(1);
   $('#today').onclick = () => selectDate(dateKey(today()));
   if ($('#last-changes')) $('#last-changes').onclick = () => selectDate(lastDate);
   if ($('#next-school')) $('#next-school').onclick = () => { for (let i = 0; i < 7; i++) { selected.setDate(selected.getDate() + 1); if (Object.keys(data.classes[className][String((selected.getDay() + 6) % 7)] || {}).length) break; } render(); };
-  $('#settings').onclick = $('#details').onclick = () => $('#source-dialog').showModal();
-  $('#close-dialog').onclick = () => $('#source-dialog').close();
+  $('#details').onclick = () => {
+    if (sourcesUnlocked) $('#source-dialog').showModal();
+    else { $('#access-dialog').showModal(); $('#source-password').focus(); }
+  };
+  $('#close-access').onclick = () => $('#access-dialog').close();
+  $('#access-dialog').onclose = () => {
+    $('#source-password').value = ''; $('#password-error').textContent = ''; $('#password-error').hidden = true;
+    $('#source-password').removeAttribute('aria-invalid');
+    $('#details').focus({ preventScroll: true });
+  };
+  $('#access-form').onsubmit = event => {
+    event.preventDefault();
+    if ($('#source-password').value !== '548.8') {
+      $('#password-error').textContent = 'Неверный пароль. Попробуйте ещё раз.';
+      $('#password-error').hidden = false;
+      $('#source-password').setAttribute('aria-invalid', 'true');
+      $('#source-password').focus(); $('#source-password').select();
+      return;
+    }
+    sourcesUnlocked = true;
+    $('#access-dialog').close(); render(); $('#source-dialog').showModal();
+  };
+  $('#source-password').oninput = () => {
+    $('#password-error').textContent = ''; $('#password-error').hidden = true;
+    $('#source-password').removeAttribute('aria-invalid');
+  };
+  if (sourcesUnlocked) {
+    $('#close-dialog').onclick = () => $('#source-dialog').close();
+    $('#source-dialog').onclose = () => $('#details').focus({ preventScroll: true });
+    $('#import-file').onchange = importFile;
+    $('#clear').onclick = () => { replacements = snapshot; origin = 'snapshot'; failure = ''; save(CACHE_KEY, null); importMessage = 'Локальный импорт сброшен. Показана школьная таблица.'; render(); };
+  }
   $('#reset-class').onclick = resetClass;
-  $('#refresh').onclick = () => sync(); $('#import-file').onchange = importFile;
-  $('#clear').onclick = () => { replacements = snapshot; origin = 'snapshot'; failure = ''; save(CACHE_KEY, null); importMessage = 'Локальный импорт сброшен. Показана школьная таблица.'; render(); };
+  $('#refresh').onclick = () => sync();
   let touch;
   $('.calendar').addEventListener('touchstart', event => { touch = event.changedTouches[0]; }, { passive: true });
   $('.calendar').addEventListener('touchend', event => { const point = event.changedTouches[0]; if (touch && Math.abs(point.clientX - touch.clientX) > 70 && Math.abs(point.clientY - touch.clientY) < 60) { const direction = point.clientX < touch.clientX ? 1 : -1; if (calendarOpen) moveMonth(direction); else move(direction); } }, { passive: true });
-  if (dialogOpen) $('#source-dialog').showModal();
-  if (focused && document.getElementById(focused)) document.getElementById(focused).focus({ preventScroll: true });
+  if (calendarOpen) $('#calendar-dialog').showModal();
+  else if (accessOpen) {
+    $('#source-password').value = passwordValue;
+    $('#password-error').textContent = passwordError; $('#password-error').hidden = !passwordError;
+    if (passwordError) $('#source-password').setAttribute('aria-invalid', 'true');
+    $('#access-dialog').showModal();
+  } else if (dialogOpen && sourcesUnlocked) $('#source-dialog').showModal();
+  const focusTarget = focused && document.getElementById(focused);
+  const activeDialog = document.querySelector('dialog[open]');
+  if (focusTarget && (!activeDialog || activeDialog.contains(focusTarget))) focusTarget.focus({ preventScroll: true });
+  else if (calendarOpen) $(`#calendar-day-${dateKey(selected)}`).focus({ preventScroll: true });
 }
 
 function replacementHTML(row) {

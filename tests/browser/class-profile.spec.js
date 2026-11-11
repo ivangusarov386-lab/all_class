@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import { CLASS_COOKIE_NAME } from '../../src/profile.js';
 import { rememberTestClass, chooseClass } from '../fixtures/class-profile.js';
+import { selectMonth } from '../fixtures/ui.js';
 import { missingReplacementWorkbook } from '../fixtures/missing-replacement.js';
 
 const exportURL = 'https://docs.google.com/spreadsheets/d/**/export?format=xlsx';
@@ -44,7 +45,7 @@ test('return visits restore the class from its cookie and keep day and month nav
   await expect(page.locator('.class-badge')).toHaveText('6М');
   await page.locator('#next').click();
   await expect(page.locator('.calendar h2')).toContainText('12 ноября');
-  await page.selectOption('#month-select', '2026-11');
+  await selectMonth(page, '2026-11');
   await page.locator('#calendar-day-2026-11-05').click();
   await expect(page.locator('.replacement p')).toContainText('Шурухина О.С. · Каб. 2.24');
   await page.reload();

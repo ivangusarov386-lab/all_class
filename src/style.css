@@ -27,7 +27,7 @@ button, select, input { font: inherit; }
 button, a, select { -webkit-tap-highlight-color: transparent; }
 button { border: 0; cursor: pointer; }
 button:disabled { cursor: wait; opacity: 0.6; }
-button:focus-visible, a:focus-visible, select:focus-visible, summary:focus-visible {
+button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible {
   outline: 3px solid #c94b0b;
   outline-offset: 4px;
 }
@@ -52,6 +52,8 @@ h1, h2, h3 { font-family: inherit; }
   font-size: 0.875rem;
   font-weight: 600;
 }
+.brand-copy { display: flex; flex-direction: column; gap: 1px; line-height: 1.5; }
+.school-name { color: var(--accent); font-size: 0.8125rem; font-weight: 500; }
 .brand-icon {
   display: grid;
   place-items: center;
@@ -318,10 +320,10 @@ summary { font-size: var(--font-small); cursor: pointer; }
 .calendar-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 22px 30px 0; }
 .month-field { flex: 1; max-width: 240px; }
 .month-field select { height: 40px; font-size: 0.875rem; text-transform: capitalize; background-color: #fff9f3; }
-.calendar-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex-shrink: 0; min-height: 40px; padding: 8px 12px; border: 1px solid #efcfb5; border-radius: 9px; color: var(--accent); background: #fff6ed; font-size: var(--font-small); font-weight: 500; }
+.calendar-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; max-width: 320px; min-height: 44px; padding: 10px 16px; border: 1px solid #efcfb5; border-radius: 10px; color: var(--accent); background: #fff6ed; font-size: 0.875rem; font-weight: 500; }
 .calendar-toggle[aria-expanded="true"] { background: #ffe4ce; border-color: #e8a16d; }
 .calendar-heading { padding-top: 18px; }
-.month-panel { margin: 0 30px 24px; padding: 16px; border: 1px solid var(--accent-border); border-radius: 14px; background: #fffaf6; }
+.month-panel { padding: 0; }
 .month-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; color: var(--muted); font-size: var(--font-small); }
 .month-controls { display: flex; gap: 6px; }
 .month-controls button { width: 36px; height: 34px; border: 1px solid #eed4bd; border-radius: 8px; background: #fff; color: var(--accent); font-size: 1.125rem; line-height: 1; }
@@ -349,11 +351,34 @@ summary { font-size: var(--font-small); cursor: pointer; }
   .calendar-toolbar { gap: 10px; padding: 18px 18px 0; }
   .month-field { max-width: 210px; }
   .month-field select { padding-left: 10px; font-size: var(--font-small); }
-  .calendar-toggle { padding: 8px 10px; gap: 5px; font-size: var(--font-note); }
   .calendar-heading { padding-top: 16px; }
-  .month-panel { margin: 0 15px 20px; padding: 12px 9px; }
   .month-weekdays, .month-grid { gap: 4px; }
   .month-day { min-height: 45px; padding: 6px 1px; border-radius: 7px; font-size: 0.9375rem; }
+}
+
+.week { padding-bottom: 14px; }
+.calendar-action { display: flex; justify-content: center; padding: 0 30px 24px; }
+dialog.calendar-dialog { max-width: 480px; max-height: calc(100dvh - 32px); padding: 24px; }
+.calendar-dialog #calendar-description { margin: 10px 0 22px; }
+.calendar-dialog .month-field { max-width: none; }
+.calendar-dialog .month-field select { font-size: 0.875rem; }
+.calendar-dialog .month-controls button { min-height: 40px; }
+.calendar-dialog .month-day { background: #fff5eb; }
+.calendar-dialog .month-day.outside-month { background: transparent; }
+.calendar-dialog .month-day.selected { background: var(--accent); }
+.calendar-dialog .month-day:hover:not(.selected) { background: #ffe5ce; }
+.calendar-dialog .month-day:focus-visible { outline-offset: 1px; }
+dialog.access-dialog { max-width: 420px; }
+.access-dialog .field { margin: 20px 0; }
+.access-dialog input { display: block; width: 100%; min-height: 48px; padding: 10px 14px; border: 1px solid #dfcabb; border-radius: 9px; background: #fff; color: var(--ink); font-size: 1rem; }
+.access-dialog input[aria-invalid="true"] { border-color: #b33640; }
+.access-dialog .password-error { margin: -8px 0 18px; color: #a32937; font-size: var(--font-small); }
+@media (max-width: 680px) {
+  .calendar-action { padding: 0 15px 20px; }
+  dialog.calendar-dialog { padding: 20px 18px; }
+  .calendar-dialog .month-panel-heading { gap: 8px; }
+  .calendar-dialog .month-controls { gap: 5px; }
+  .calendar-dialog .month-controls button { width: 32px; }
 }
 
 .setup-background { min-height: 100vh; }
