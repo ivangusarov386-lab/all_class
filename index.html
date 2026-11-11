@@ -1,1 +1,26 @@
-<!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#315bea"><meta name="description" content="Школьное расписание по классам и дням с заменами"><title>Перемена — расписание школы</title></head><body><div id="app"></div><script type="module" src="/src/main.js"></script></body></html>
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#101f45">
+    <meta name="description" content="Школьное расписание по классам и дням с заменами">
+    <title>Перемена — расписание школы</title>
+    <style>
+      html { background: #080f26; color: #eef2fb; font-family: "Segoe UI", Arial, sans-serif; }
+      .startup { max-width: 620px; margin: 15vh auto; padding: 24px; line-height: 1.6; }
+      .startup a { color: #b6ccff; }
+    </style>
+    <link rel="stylesheet" href="./src/style.css">
+  </head>
+  <body>
+    <div id="app">
+      <main class="startup" role="status">
+        <h1>Школьное расписание</h1>
+        <p>Загружаем уроки…</p>
+        <noscript><p>Включите JavaScript в браузере, чтобы выбрать класс и день.</p></noscript>
+      </main>
+    </div>
+    <script type="module" src="./src/startup.js"></script>
+  </body>
+</html>

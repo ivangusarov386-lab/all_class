@@ -8,11 +8,13 @@ permissions:
   pages: write
   id-token: write
 concurrency:
-  group: pages
+  group: school-website-workflow
   cancel-in-progress: true
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      pages_build_type: ${{ steps.pages.outputs.result }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,10 +24,26 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - name: Check how Pages is configured
+        id: pages
+        uses: actions/github-script@v8
+        with:
+          result-encoding: string
+          script: |
+            const { data } = await github.rest.repos.getPages({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            return data.build_type;
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
   deploy:
+    # Branch-based Pages publishes the ready-to-serve files itself on each push.
+    # Use the custom deployment only when Pages Source is "GitHub Actions".
+    if: needs.build.outputs.pages_build_type == 'workflow'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

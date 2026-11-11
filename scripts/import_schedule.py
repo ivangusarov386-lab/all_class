@@ -25,5 +25,5 @@ bells=[]
 for cell in list(sheet.values)[1][4:14]:
     n,start,end=str(cell).split('\n'); bells.append({'number':int(n),'start':start.replace('.',':'),'end':end.replace('.',':')})
 data={'source':'schedule_teachers_readable.xlsx','classes':classes,'bells':bells,'notes':['Названия предметов взяты из разделов исходной таблицы. Русский язык и литература, история и обществознание не разделены в источнике.','Кабинет указан из строки учителя; отдельного кабинета для каждого занятия в источнике нет.','Несколько учителей в одном уроке показаны вместе: деление на подгруппы в источнике не обозначено.'],'unparsed':sorted(unknown)}
-Path('public/data/schedule.json').write_text(json.dumps(data,ensure_ascii=False,indent=2))
+Path('data/schedule.json').write_text(json.dumps(data,ensure_ascii=False,indent=2))
 print(f'{len(classes)} classes, {entries} entries, unparsed: {sorted(unknown)}')
