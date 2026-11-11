@@ -1,5 +1,6 @@
 import { EXPORT_URL, SHEET_URL, REPLACEMENT_DATA_VERSION, readReplacementWorkbook, teacherKey } from './replacements.js?v=3';
 import { dateKey, monthKey, dateInMonth, shiftMonth, monthGrid, monthOptions } from './calendar.js';
+import { readClassCookie, rememberClass, forgetClass } from './profile.js';
 
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -14,7 +15,8 @@ const logoURL = new URL('../assets/school-emblem.svg', import.meta.url).href;
 const CACHE_KEY = `school-replacements-v${REPLACEMENT_DATA_VERSION}`;
 const empty = () => ({ version: REPLACEMENT_DATA_VERSION, entries: [], unresolved: [], coverage: [], sheets: [], stats: {} });
 let selected = today(), calendarOpen = false, data, snapshot = empty(), replacements = empty();
-let className = read('school-class', '9Ц'), origin = 'snapshot', busy = false, failure = '', importMessage = '';
+let className = '', setupGrade = '', setupClass = '', preferenceNotice = '';
+let origin = 'snapshot', busy = false, failure = '', importMessage = '';
 const validDataset = value => value?.version === REPLACEMENT_DATA_VERSION && Array.isArray(value.entries) && Array.isArray(value.unresolved) && Array.isArray(value.coverage);
 
 function move(days) { selected.setDate(selected.getDate() + days); render(); }
@@ -49,7 +51,53 @@ function sheetReportsHTML() {
   return `<ul class="sheet-reports">${reports.map(report => `<li><strong>${esc(report.name)}</strong><span>${report.firstDate ? `Даты записей: ${fullDate(report.firstDate)} — ${fullDate(report.lastDate)}.` : 'Заполненных дат пока нет.'}</span><span>${Object.entries(report.monthCounts).map(([key, count]) => `${monthLabel(key)}: ${plural(count, 'строка', 'строки', 'строк')}`).join('; ')}</span>${report.otherMonthRows ? `<span class="sheet-month-note">${plural(report.otherMonthRows, 'строка относится', 'строки относятся', 'строк относятся')} к другим месяцам. Учитываются даты самих записей.</span>` : ''}</li>`).join('')}</ul>`;
 }
 
-function updateClass(value) { className = value; save('school-class', className); render(); }
+function renderClassSetup(classes) {
+  const grades = [...new Set(classes.map(name => parseInt(name)))];
+  $('#app').innerHTML = `
+    <div class="page setup-background"><header class="topbar"><a href="./" class="brand"><img class="school-emblem" src="${logoURL}" alt="Герб школы" width="48" height="48"> Школьное расписание</a></header></div>
+    <dialog id="class-dialog" class="class-setup" aria-labelledby="class-setup-title" aria-describedby="class-setup-description">
+      <img class="setup-emblem" src="${logoURL}" alt="" width="64" height="64">
+      <h2 id="class-setup-title">Выберите свой класс</h2>
+      <p id="class-setup-description">Выберите параллель и класс. В следующий раз сразу откроется ваше расписание.</p>
+      <form id="class-form">
+        <div class="setup-fields">
+          <div class="field"><label for="grade">Параллель</label><select id="grade" name="grade" required><option value="" disabled ${setupGrade ? '' : 'selected'}>Выберите</option>${grades.map(grade => `<option value="${grade}" ${String(grade) === setupGrade ? 'selected' : ''}>${grade}-я</option>`).join('')}</select></div>
+          <div class="field class-field"><label for="class-select">Класс</label><select id="class-select" name="className" required ${setupGrade ? '' : 'disabled'}></select></div>
+        </div>
+        <button id="open-schedule" class="setup-submit" type="submit" disabled>Открыть расписание</button>
+      </form>
+      <p class="setup-note">Выбор сохранится в этом браузере. Изменить его можно кнопкой «Сбросить класс» внизу сайта.</p>
+    </dialog>`;
+  function updateClassOptions() {
+    const available = classes.filter(name => String(parseInt(name)) === setupGrade);
+    if (!available.includes(setupClass)) setupClass = '';
+    $('#class-select').innerHTML = `<option value="" disabled ${setupClass ? '' : 'selected'}>Выберите</option>${available.map(name => `<option value="${esc(name)}" ${name === setupClass ? 'selected' : ''}>${esc(name)}</option>`).join('')}`;
+    $('#class-select').disabled = !setupGrade;
+    $('#open-schedule').disabled = !setupClass;
+  }
+  updateClassOptions();
+  $('#grade').onchange = event => { setupGrade = event.target.value; setupClass = ''; updateClassOptions(); };
+  $('#class-select').onchange = event => { setupClass = event.target.value; $('#open-schedule').disabled = !classes.includes(setupClass); };
+  $('#class-form').onsubmit = event => {
+    event.preventDefault();
+    if (!classes.includes(setupClass) || String(parseInt(setupClass)) !== setupGrade) return;
+    className = setupClass;
+    preferenceNotice = rememberClass(className) ? '' : 'Класс выбран для этого посещения. Браузер не разрешил запомнить выбор.';
+    render();
+    $('#class-profile-heading')?.focus({ preventScroll: true });
+  };
+  $('#class-dialog').oncancel = event => event.preventDefault();
+  $('#class-dialog').showModal();
+}
+
+function resetClass() {
+  forgetClass();
+  try { localStorage.removeItem('school-class'); } catch {}
+  className = ''; setupGrade = ''; setupClass = ''; preferenceNotice = '';
+  selected = today(); calendarOpen = false;
+  render();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
 function syncStatus() {
   const label = origin === 'file' ? 'Загруженный файл' : origin === 'google' ? 'Google Таблицы' : 'Сохранённая копия таблицы';
   const timestamp = replacements.fetchedAt ? fmt(new Date(replacements.fetchedAt), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' }) : '';
@@ -58,11 +106,15 @@ function syncStatus() {
 }
 
 function render() {
+  const classes = Object.keys(data.classes).sort((a, b) => parseInt(a) - parseInt(b) || a.localeCompare(b, 'ru'));
+  if (!classes.includes(className)) {
+    className = '';
+    // A network refresh must not interrupt an unfinished class selection.
+    if (!$('#class-dialog')) renderClassSetup(classes);
+    return;
+  }
   const dialogOpen = $('#source-dialog')?.open;
   const focused = document.activeElement?.id;
-  const classes = Object.keys(data.classes).sort((a, b) => parseInt(a) - parseInt(b) || a.localeCompare(b, 'ru'));
-  if (!classes.includes(className)) className = classes[0];
-  const grade = parseInt(className), grades = [...new Set(classes.map(name => parseInt(name)))];
   const sourceMonths = [...new Set([...replacements.coverage.map(key => key.slice(0, 7)), ...(replacements.sheetReports || []).map(report => report.declaredMonth).filter(Boolean)])];
   const months = monthOptions(today(), selected, sourceMonths);
   const dayCounts = new Map();
@@ -93,11 +145,7 @@ function render() {
         <button class="text-button" id="settings">Источники ${externalIcon}</button>
       </header>
       <main>
-        <section class="hero"><div class="class-badge" aria-label="Выбранный класс ${esc(className)}">${esc(className)}</div><div class="hero-copy"><p>Все уроки под рукой</p><h1>Твой учебный день.</h1><p class="subtitle">Выбери класс. Остальное — по расписанию.</p></div></section>
-        <section class="chooser" aria-label="Выбор класса">
-          <div class="field"><label for="grade">Параллель</label><select id="grade">${grades.map(g => `<option ${g === grade ? 'selected' : ''} value="${g}">${g}-я</option>`).join('')}</select></div>
-          <div class="field class-field"><label for="class-select">Класс</label><select id="class-select">${classes.filter(name => parseInt(name) === grade).map(name => `<option value="${esc(name)}" ${name === className ? 'selected' : ''}>${esc(name)}</option>`).join('')}</select></div>
-        </section>
+        <section class="hero"><div class="class-badge" aria-label="Выбранный класс ${esc(className)}">${esc(className)}</div><div class="hero-copy"><p>Все уроки под рукой</p><h1 id="class-profile-heading" tabindex="-1">Твой учебный день.</h1><p class="subtitle">Расписание твоего класса с учётом замен.</p></div></section>
         <section class="calendar">
           <div class="calendar-toolbar"><div class="field month-field"><label class="sr-only" for="month-select">Месяц расписания</label><select id="month-select">${months.map(month => `<option value="${month}" ${month === monthKey(selected) ? 'selected' : ''}>${esc(fmt(new Date(month + '-01T12:00:00'), { month: 'long', year: 'numeric' }).replace(' г.', ''))}</option>`).join('')}</select></div><button id="toggle-calendar" class="calendar-toggle" aria-label="${calendarOpen ? 'Скрыть календарь' : 'Открыть календарь'}" aria-controls="month-panel" aria-expanded="${calendarOpen}"><svg class="inline-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18"/></svg> Даты <span aria-hidden="true">${calendarOpen ? '⌃' : '⌄'}</span></button></div>
           <div class="calendar-heading"><div><h2>${isToday ? 'Сегодня' : esc(fmt(selected, { weekday: 'long' }))}<span class="date-label">${shortDate(key)}</span></h2></div><div class="day-controls"><button id="today">Сегодня</button><button id="prev" aria-label="Предыдущий день">←</button><button id="next" aria-label="Следующий день">→</button></div></div>
@@ -113,7 +161,8 @@ function render() {
           <div class="sync-bar"><div><span class="status-dot ${failure ? '' : 'loaded'}"></span><span id="sync-status" role="status">${esc(syncStatus())}</span></div><button id="refresh" ${busy ? 'disabled' : ''}>${busy ? 'Загрузка…' : '↻ Обновить замены'}</button></div>
         </section>
         <p class="source-note">Красным — замена, зачёркнуто — исходное занятие.${latest ? ' Последние записи в таблице: ' + shortDate(latest) + '.' : ''}<br>Время уроков — московское. Смахните влево или вправо, чтобы сменить день.</p>
-        <footer><span>Учиться проще, когда всё по порядку.</span><button class="text-button" id="details">О расписании</button></footer>
+        ${preferenceNotice ? `<p class="preference-notice" role="status">${esc(preferenceNotice)}</p>` : ''}
+        <footer><span>Учиться проще, когда всё по порядку.</span><div class="footer-actions"><button class="text-button" id="details">О расписании</button><button class="reset-class" id="reset-class" type="button">Сбросить класс</button></div></footer>
       </main>
     </div>
     <dialog id="source-dialog">
@@ -133,8 +182,6 @@ function render() {
       ${review.length ? `<details class="source-review"><summary>Записи для проверки: ${esc(className)} и строки без класса (${review.length})</summary><p class="small">Показаны последние ${Math.min(30, review.length)} записей. Исправьте исходную строку в Google Таблице и обновите замены.</p><ul>${review.slice(0, 30).map(row => `<li><strong>${row.date ? shortDate(row.date) : 'Без даты'} · ${esc(row.sourceClass)}${row.lesson ? ' · ' + row.lesson + ' урок' : ''}</strong><span>${esc(row.subject || row.originalSubject)} · ${esc(row.teacher)}</span><span>${esc(row.reason)}</span><small>${esc(row.source?.sheet)} · строка ${esc(row.source?.row)}</small></li>`).join('')}</ul></details>` : ''}
       <details><summary>Особенности исходных таблиц</summary>${data.notes.map(note => `<p class="small">${esc(note)}</p>`).join('')}<p class="small">Даты берутся из строк, а не из названия листа. Повторы удаляются. При замене одной подгруппы зачёркивается только её учитель. Если кабинет не заполнен в таблице замен, приложение не подставляет его автоматически.</p></details>
     </dialog>`;
-  $('#grade').onchange = event => updateClass(classes.find(name => parseInt(name) === +event.target.value));
-  $('#class-select').onchange = event => updateClass(event.target.value);
   document.querySelectorAll('[data-date]').forEach(button => button.onclick = () => selectDate(button.dataset.date));
   $('#month-select').onchange = event => changeMonth(event.target.value);
   $('#toggle-calendar').onclick = () => { calendarOpen = !calendarOpen; render(); };
@@ -147,6 +194,7 @@ function render() {
   if ($('#next-school')) $('#next-school').onclick = () => { for (let i = 0; i < 7; i++) { selected.setDate(selected.getDate() + 1); if (Object.keys(data.classes[className][String((selected.getDay() + 6) % 7)] || {}).length) break; } render(); };
   $('#settings').onclick = $('#details').onclick = () => $('#source-dialog').showModal();
   $('#close-dialog').onclick = () => $('#source-dialog').close();
+  $('#reset-class').onclick = resetClass;
   $('#refresh').onclick = () => sync(); $('#import-file').onchange = importFile;
   $('#clear').onclick = () => { replacements = snapshot; origin = 'snapshot'; failure = ''; save(CACHE_KEY, null); importMessage = 'Локальный импорт сброшен. Показана школьная таблица.'; render(); };
   let touch;
@@ -203,6 +251,11 @@ async function init() {
     const response = await fetch(new URL('../data/schedule.json', import.meta.url));
     if (!response.ok) throw Error();
     data = await response.json();
+    const savedClass = readClassCookie();
+    className = Object.keys(data.classes).includes(savedClass) ? savedClass : '';
+    const previousChoice = read('school-class', '');
+    setupClass = !className && Object.keys(data.classes).includes(previousChoice) ? previousChoice : '';
+    setupGrade = setupClass ? String(parseInt(setupClass)) : '';
     try {
       const response = await fetch(new URL('../data/replacements.json', import.meta.url), { cache: 'no-store' });
       const result = response.ok ? await response.json() : null;

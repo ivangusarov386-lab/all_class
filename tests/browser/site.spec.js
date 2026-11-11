@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
+import { rememberTestClass, chooseClass } from '../fixtures/class-profile.js';
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page, baseURL }) => {
+  await rememberTestClass(page, baseURL);
   await page.clock.setFixedTime(new Date('2026-11-11T09:00:00Z'));
   await page.route('https://docs.google.com/spreadsheets/d/**/export?format=xlsx', route => route.abort('internetdisconnected'));
 });
@@ -11,7 +13,7 @@ test('opens under the repository path with no build server or external dependenc
   page.on('pageerror', error => errors.push(error.message));
   page.on('response', response => responses.push(response));
   await page.goto('./');
-  await expect(page.locator('#class-select')).toHaveValue('9Ц');
+  await expect(page.locator('.class-badge')).toHaveText('9Ц');
   await expect(page.locator('.lesson').first()).toBeVisible();
   await expect(page.locator('.calendar h2')).toContainText('Сегодня');
   expect(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundImage)).not.toBe('none');
@@ -20,10 +22,9 @@ test('opens under the repository path with no build server or external dependenc
   expect(responses.every(response => new URL(response.url()).hostname === '127.0.0.1')).toBe(true);
   expect(responses.some(response => /xlsx.*\.(js|mjs)/.test(response.url()))).toBe(false);
 
-  await page.selectOption('#grade', '5');
-  await page.selectOption('#class-select', '5А');
+  await chooseClass(page, '5А');
   await page.reload();
-  await expect(page.locator('#class-select')).toHaveValue('5А');
+  await expect(page.locator('.class-badge')).toHaveText('5А');
   await page.locator('#next').click();
   await expect(page.locator('.calendar h2')).toContainText('12 ноября');
   await page.locator('#prev').click();
@@ -58,9 +59,8 @@ test('works on a narrow phone screen', async ({ page }) => {
   await page.goto('./');
   await expect(page.locator('.lesson').first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.selectOption('#grade', '11');
-  await page.selectOption('#class-select', '11Я');
-  await expect(page.locator('#class-select')).toHaveValue('11Я');
+  await chooseClass(page, '11Я');
+  await expect(page.locator('.class-badge')).toHaveText('11Я');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
@@ -99,8 +99,7 @@ test('today is distinct from missing replacement data and the latest class recor
 test('unknown records remain visible and cancellation does not look like a teacher name', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-11-05T09:00:00Z'));
   await page.goto('./');
-  await page.selectOption('#grade', '7');
-  await page.selectOption('#class-select', '7А');
+  await chooseClass(page, '7А');
   await expect(page.locator('.replacement h3').filter({ hasText: 'Урок отменён' })).toBeVisible();
   await page.locator('#settings').click();
   await page.locator('#import-file').setInputFiles({
@@ -146,7 +145,7 @@ test('month selection opens a full grid above lessons and date selection opens r
   await expect(page.locator('#month-panel')).toBeHidden();
   await expect(page.locator('.calendar h2')).toContainText('25 сентября');
   await expect(page.locator('.replacement')).toHaveCount(3);
-  await expect(page.locator('#class-select')).toHaveValue('9Ц');
+  await expect(page.locator('.class-badge')).toHaveText('9Ц');
   await page.locator('#toggle-calendar').click();
   await page.locator('#month-prev').click();
   await expect(page.locator('#month-select')).toHaveValue('2026-08');
@@ -160,8 +159,7 @@ test('month selection opens a full grid above lessons and date selection opens r
 
 test('month and year navigation handle short months without skipping dates or losing the class', async ({ page }) => {
   await page.goto('./');
-  await page.selectOption('#grade', '11');
-  await page.selectOption('#class-select', '11Ш');
+  await chooseClass(page, '11Ш');
   await page.selectOption('#month-select', '2026-01');
   await page.locator('#calendar-day-2026-01-31').click();
   await page.selectOption('#month-select', '2026-02');
@@ -170,7 +168,7 @@ test('month and year navigation handle short months without skipping dates or lo
   await page.selectOption('#month-select', '2026-01');
   await page.locator('#month-prev').click();
   await expect(page.locator('#month-select')).toHaveValue('2025-12');
-  await expect(page.locator('#class-select')).toHaveValue('11Ш');
+  await expect(page.locator('.class-badge')).toHaveText('11Ш');
   await page.locator('#today').click();
   await expect(page.locator('#month-select')).toHaveValue('2026-11');
   await expect(page.locator('#month-panel')).toBeHidden();
@@ -224,8 +222,7 @@ for (const timezone of ['Europe/Moscow', 'America/New_York', 'Asia/Kathmandu']) 
       }));
       await page.goto('./');
       await expect(page.locator('#sync-status')).toContainText('Google Таблицы');
-      await page.selectOption('#grade', '6');
-      await page.selectOption('#class-select', '6М');
+      await chooseClass(page, '6М');
       await page.selectOption('#month-select', '2026-11');
       await page.locator('#calendar-day-2026-11-05').click();
       const fourth = page.locator('.lesson').filter({ has: page.locator('.lesson-number', { hasText: /^4$/ }) });
@@ -246,7 +243,8 @@ for (const timezone of ['Europe/Moscow', 'America/New_York', 'Asia/Kathmandu']) 
   });
 }
 
-test('a newer legacy cache with shifted dates cannot hide the correct bundled replacement', async ({ page }) => {
+test('a newer legacy cache with shifted dates cannot hide the correct bundled replacement', async ({ page, baseURL }) => {
+  await rememberTestClass(page, baseURL, '6М');
   const previous = JSON.parse(fs.readFileSync('data/replacements.json'));
   previous.version = 2;
   previous.origin = 'file';
@@ -259,7 +257,7 @@ test('a newer legacy cache with shifted dates cannot hide the correct bundled re
     localStorage.setItem('school-class', JSON.stringify('6М'));
   }, previous);
   await page.goto('./');
-  await expect(page.locator('#class-select')).toHaveValue('6М');
+  await expect(page.locator('.class-badge')).toHaveText('6М');
   await page.selectOption('#month-select', '2026-11');
   await page.locator('#calendar-day-2026-11-05').click();
   await expect(page.locator('.replacement p')).toContainText('Шурухина О.С. · Каб. 2.24');

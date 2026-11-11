@@ -355,3 +355,28 @@ summary { font-size: var(--font-small); cursor: pointer; }
   .month-weekdays, .month-grid { gap: 4px; }
   .month-day { min-height: 45px; padding: 6px 1px; border-radius: 7px; font-size: 0.9375rem; }
 }
+
+.setup-background { min-height: 100vh; }
+dialog.class-setup { max-width: 470px; padding: 30px; }
+dialog.class-setup::backdrop { background: #fff2e2b8; backdrop-filter: blur(4px); }
+.setup-emblem { display: block; width: 64px; height: 64px; margin-bottom: 18px; }
+.class-setup h2 { font-size: 1.625rem; line-height: 1.25; font-weight: 650; letter-spacing: -0.025em; }
+.class-setup > p { margin: 12px 0 0; }
+.setup-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 24px 0; }
+.setup-fields select { font-size: 0.875rem; padding-left: 12px; }
+.setup-fields select:disabled { cursor: default; opacity: 0.6; }
+.setup-submit { display: block; width: 100%; min-height: 48px; padding: 12px 16px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 0.9375rem; font-weight: 600; line-height: 1.5; }
+.setup-submit:disabled { cursor: default; opacity: 1; background: #edd9ca; color: #746254; }
+.class-setup > .setup-note { margin-top: 18px; font-size: var(--font-note); line-height: 1.7; }
+.footer-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.footer-actions .text-button { min-height: auto; padding: 0; }
+.reset-class { min-height: 28px; padding: 4px 0; background: none; color: var(--muted); font-size: 0.6875rem; line-height: 1.5; white-space: nowrap; }
+.reset-class:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.preference-notice { padding: 0 5px 16px; color: var(--muted); font-size: var(--font-note); line-height: 1.7; }
+@media (max-width: 420px) {
+  dialog.class-setup { padding: 24px; }
+  .class-setup h2 { font-size: 1.5rem; }
+  .setup-fields { grid-template-columns: minmax(0, 1fr); gap: 16px; margin: 20px 0; }
+  .setup-fields select { font-size: 0.9375rem; }
+  footer > span { min-width: 0; }
+}
