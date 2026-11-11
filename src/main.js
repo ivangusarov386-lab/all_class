@@ -71,7 +71,7 @@ function renderClassSetup(classes) {
       <p id="class-setup-description">Выберите параллель и класс. В следующий раз сразу откроется ваше расписание.</p>
       <form id="class-form">
         <div class="setup-fields">
-          <div class="field"><label for="grade">Параллель</label><select id="grade" name="grade" required><option value="" disabled ${setupGrade ? '' : 'selected'}>Выберите</option>${grades.map(grade => `<option value="${grade}" ${String(grade) === setupGrade ? 'selected' : ''}>${grade}-я</option>`).join('')}</select></div>
+          <div class="field"><label for="grade">Параллель</label><select id="grade" name="grade" required><option value="" disabled ${setupGrade ? '' : 'selected'}>Выберите</option>${grades.map(grade => `<option value="${grade}" ${String(grade) === setupGrade ? 'selected' : ''}>${grade} параллель</option>`).join('')}</select></div>
           <div class="field class-field"><label for="class-select">Класс</label><select id="class-select" name="className" required ${setupGrade ? '' : 'disabled'}></select></div>
         </div>
         <button id="open-schedule" class="setup-submit" type="submit" disabled>Открыть расписание</button>

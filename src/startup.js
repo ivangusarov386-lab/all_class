@@ -1,5 +1,5 @@
 // Keep a useful screen even if the app module cannot be downloaded or started.
-import('./main.js?v=5').catch(error => {
+import('./main.js?v=7').catch(error => {
   console.error('Unable to start school timetable:', error);
   document.getElementById('app').innerHTML = `
     <main class="startup" role="alert">
