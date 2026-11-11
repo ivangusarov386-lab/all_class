@@ -9,7 +9,7 @@ test('opens under the repository path with no build server or external dependenc
   page.on('pageerror', error => errors.push(error.message));
   page.on('response', response => responses.push(response));
   await page.goto('./');
-  await expect(page.locator('.class-button.active')).toHaveText('9Ц');
+  await expect(page.locator('#class-select')).toHaveValue('9Ц');
   await expect(page.locator('.lesson').first()).toBeVisible();
   await expect(page.locator('.calendar h2')).toContainText('Сегодня');
   expect(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundImage)).not.toBe('none');
@@ -19,9 +19,9 @@ test('opens under the repository path with no build server or external dependenc
   expect(responses.some(response => /xlsx.*\.(js|mjs)/.test(response.url()))).toBe(false);
 
   await page.selectOption('#grade', '5');
-  await page.locator('[data-class="5А"]').click();
+  await page.selectOption('#class-select', '5А');
   await page.reload();
-  await expect(page.locator('.class-button.active')).toHaveText('5А');
+  await expect(page.locator('#class-select')).toHaveValue('5А');
   await page.locator('#next').click();
   await expect(page.locator('.calendar h2')).toContainText('12 ноября');
   await page.locator('#prev').click();
@@ -57,8 +57,8 @@ test('works on a narrow phone screen', async ({ page }) => {
   await expect(page.locator('.lesson').first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.selectOption('#grade', '11');
-  await page.locator('[data-class="11Я"]').click();
-  await expect(page.locator('.class-button.active')).toHaveText('11Я');
+  await page.selectOption('#class-select', '11Я');
+  await expect(page.locator('#class-select')).toHaveValue('11Я');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
