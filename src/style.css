@@ -287,3 +287,28 @@ summary { font-size: var(--font-small); cursor: pointer; }
   button, select { transition: background-color 0.15s, border-color 0.15s; }
   .week-day:hover:not(.selected), .day-controls button:hover { background-color: #ffe4cd; }
 }
+
+.school-emblem { display: block; width: 48px; height: 48px; flex-shrink: 0; object-fit: contain; }
+.coverage-note { padding: 14px 30px; background: #fffaf5; color: var(--muted); font-size: var(--font-small); line-height: 1.6; border-bottom: 1px solid var(--line); }
+.coverage-note button { display: block; padding: 7px 0 0; color: var(--accent); background: none; font-size: inherit; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+.unmatched { padding: 18px 30px; background: #fff6ed; border-bottom: 1px solid var(--accent-border); }
+.unmatched h3 { font-size: 0.9375rem; color: #8c430c; }
+.unmatched > p { margin-top: 5px; font-size: var(--font-small); color: var(--muted); }
+.unmatched ul { list-style: none; padding: 0; margin: 14px 0 0; }
+.unmatched li { padding: 12px 0; border-top: 1px solid #eed7c3; font-size: var(--font-small); }
+.unmatched li strong, .unmatched li span, .unmatched li small { display: block; }
+.unmatched li strong { color: #a32937; }
+.unmatched li span { margin-top: 3px; }
+.unmatched li small { margin-top: 4px; color: var(--muted); }
+.replacement small { display: block; margin-top: 5px; font-size: var(--font-note); line-height: 1.5; }
+.original + .replacement { padding-top: 14px; }
+@media (max-width: 680px) {
+  .school-emblem { width: 40px; height: 40px; }
+  .coverage-note { padding: 13px 18px; }
+  .unmatched { padding: 16px 18px; }
+}
+.source-review { margin-bottom: 20px; }
+.source-review ul { list-style: none; padding: 0; margin: 0; }
+.source-review li { padding: 10px 0; border-top: 1px solid var(--line); font-size: var(--font-small); }
+.source-review strong, .source-review span, .source-review small { display: block; }
+.source-review span, .source-review small { margin-top: 4px; color: var(--muted); }

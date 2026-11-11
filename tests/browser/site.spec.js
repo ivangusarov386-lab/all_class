@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
 
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-11-11T09:00:00Z'));
+  await page.route('https://docs.google.com/spreadsheets/d/**/export?format=xlsx', route => route.abort('internetdisconnected'));
 });
 
 test('opens under the repository path with no build server or external dependencies', async ({ page }) => {
@@ -67,4 +69,68 @@ test('shows a useful message if the app module fails to load', async ({ page }) 
   await page.goto('./');
   await expect(page.getByRole('alert')).toContainText('Не удалось открыть расписание');
   await expect(page.getByRole('link', { name: 'Перезагрузить страницу' })).toBeVisible();
+});
+
+
+test('bundled school replacements survive an unavailable Google connection and only strike the replaced subgroup', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-09-25T09:00:00Z'));
+  await page.goto('./');
+  await expect(page.locator('.coverage-note')).toHaveCount(0);
+  const third = page.locator('.lesson').filter({ has: page.locator('.lesson-number', { hasText: /^3$/ }) });
+  await expect(third.locator('.replacement h3')).toHaveText('Информатика');
+  await expect(third.locator('.replacement p')).toContainText('Харисова Е.А.');
+  await expect(third.locator('.crossed p')).toContainText('Путилкина Н.П.');
+  const seventh = page.locator('.lesson').filter({ has: page.locator('.lesson-number', { hasText: /^7$/ }) });
+  await expect(seventh.locator('.original').filter({ hasText: 'Вереина О.К.' })).not.toHaveClass(/crossed/);
+  await expect(seventh.locator('.original').filter({ hasText: 'Саакян М.А.' })).toHaveClass(/crossed/);
+  await expect(page.locator('#sync-status')).toContainText('Не удалось обновить');
+  await expect(page.locator('img[alt="Герб школы"]')).toBeVisible();
+  await expect.poll(() => page.locator('img[alt="Герб школы"]').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+});
+
+test('today is distinct from missing replacement data and the latest class records are reachable', async ({ page }) => {
+  await page.goto('./');
+  await expect(page.locator('.coverage-note')).toContainText('На 11 ноября в таблице пока нет записей замен');
+  await page.locator('#last-changes').click();
+  await expect(page.locator('.calendar h2')).toContainText('28 сентября');
+  await expect(page.locator('.replacement').first()).toBeVisible();
+});
+
+test('unknown records remain visible and cancellation does not look like a teacher name', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-05T09:00:00Z'));
+  await page.goto('./');
+  await page.selectOption('#grade', '7');
+  await page.selectOption('#class-select', '7А');
+  await expect(page.locator('.replacement h3').filter({ hasText: 'Урок отменён' })).toBeVisible();
+  await page.locator('#settings').click();
+  await page.locator('#import-file').setInputFiles({
+    name: 'unmatched.csv', mimeType: 'text/csv',
+    buffer: Buffer.from('Дата;Класс;Урок;Предмет;Учитель;Кого заменяют\n05.11.2026;7А;;Физика;Тестовый учитель;Неизвестный А.А.\n'),
+  });
+  await page.locator('#close-dialog').click();
+  await expect(page.locator('.unmatched')).toContainText('Номер урока не указан');
+  await expect(page.locator('.crossed')).toHaveCount(0);
+});
+
+test('Google refresh reads the school schema and caches the result for a reload without network', async ({ page }) => {
+  const snapshot = JSON.parse(fs.readFileSync('data/replacements.json'));
+  snapshot.fetchedAt = '2026-11-10T00:00:00Z';
+  await page.route(/\/(?:data\/replacements\.json|assets\/replacements-[^/]+\.json)$/, route => route.fulfill({ json: snapshot }));
+  const { utils, write } = await import('../../vendor/xlsx.js');
+  const book = utils.book_new();
+  utils.book_append_sheet(book, utils.aoa_to_sheet([
+    ['Дата', 'Ф.И.О. учителя,пропустившего урок', 'Предмет', 'Класс', 'Урок', 'Кабинет', 'Ф.И.О. учителя,заменившего урок', 'Предмет'],
+    ['11.11.2026', 'Шаповаленко Т.Г.', 'Физика', '9ц', '3-4', '2.40', 'Учитель из Google', 'Физика'],
+  ]), 'Ноябрь');
+  await page.route('https://docs.google.com/spreadsheets/d/**/export?format=xlsx', route => route.fulfill({
+    status: 200, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    body: Buffer.from(write(book, { type: 'buffer', bookType: 'xlsx' })),
+  }));
+  await page.goto('./');
+  await expect(page.locator('#sync-status')).toContainText('Google Таблицы');
+  await expect(page.locator('.replacement p').filter({ hasText: 'Учитель из Google' })).toHaveCount(2);
+  await page.route('https://docs.google.com/spreadsheets/d/**/export?format=xlsx', route => route.abort('internetdisconnected'));
+  await page.reload();
+  await expect(page.locator('#sync-status')).toContainText('Не удалось обновить');
+  await expect(page.locator('.replacement p').filter({ hasText: 'Учитель из Google' })).toHaveCount(2);
 });
