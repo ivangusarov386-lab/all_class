@@ -82,22 +82,37 @@ h1, h2, h3 { font-family: inherit; }
 
 .hero { display: flex; align-items: center; gap: 30px; padding: 34px 4px; }
 .class-badge {
+  --badge-step: 3px;
+  position: relative;
+  isolation: isolate;
   display: grid;
   place-items: center;
+  flex-shrink: 0;
   min-width: 164px;
   min-height: 132px;
   padding: 18px 22px;
-  border: 1px solid #f6aa6b;
+  border: 1px solid #ffc18a;
   border-radius: 22px;
-  background: linear-gradient(145deg, #fff9f3, #ffe1c3 45%, #ffb570);
-  color: #a33907;
-  box-shadow: 0 8px 24px #ba571018, inset 0 1px 0 #ffffffc9;
+  background: radial-gradient(ellipse at 15% 0%, #ffe2b66b, transparent 60%), linear-gradient(145deg, #f99336, #e96515 48%, #ca4208);
+  color: #fffaf3;
+  box-shadow:
+    inset 0 2px 0 #fff6eac9,
+    inset 2px 0 2px #ffd5a280,
+    inset 0 -2px 3px #a72d074d,
+    0 var(--badge-step) 0 #da550b,
+    0 calc(var(--badge-step) * 2) 0 #b63c06,
+    0 calc(var(--badge-step) * 3) 0 #923006,
+    0 calc(var(--badge-step) * 5) 18px #9e3a1133,
+    0 calc(var(--badge-step) * 9) 32px -12px #ba57104d;
+  transform: perspective(600px) rotateX(8deg) rotateY(-10deg) rotateZ(-3deg);
   font-size: 4rem;
   font-weight: 700;
   letter-spacing: -0.04em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 0 #ffd7ad, 0 2px 0 #bd4408, 0 3px 0 #963006, 0 7px 10px #862d074d;
 }
+.class-badge::before { content: ''; position: absolute; z-index: -1; inset: 2px 2px 45%; border-radius: 19px 19px 40% 40%; background: linear-gradient(155deg, #fff8e940, #fff0 75%); pointer-events: none; }
 .hero-copy { min-width: 0; }
 .hero-copy > p:first-child { color: var(--accent); font-size: var(--font-small); font-weight: 500; margin-bottom: 7px; }
 h1 { font-size: 2.125rem; font-weight: 650; line-height: 1.2; letter-spacing: -0.035em; }
@@ -243,7 +258,8 @@ summary { font-size: var(--font-small); cursor: pointer; }
   .brand-icon { width: 32px; height: 32px; }
   .topbar .text-button { font-size: var(--font-note); }
   .hero { gap: 20px; padding: 28px 2px; }
-  .class-badge { min-width: 116px; min-height: 110px; padding: 16px; border-radius: 18px; font-size: 2.875rem; }
+  .class-badge { --badge-step: 2.5px; min-width: 116px; min-height: 110px; padding: 16px; border-radius: 18px; font-size: 2.875rem; }
+  .class-badge::before { border-radius: 15px 15px 40% 40%; }
   h1 { font-size: 1.75rem; line-height: 1.2; }
   .hero-copy > p:first-child { font-size: var(--font-note); }
   .subtitle { margin-top: 8px; font-size: var(--font-small); line-height: 1.6; }
@@ -280,7 +296,7 @@ summary { font-size: var(--font-small); cursor: pointer; }
 
 @media (max-width: 420px) {
   .hero { gap: 16px; }
-  .class-badge { min-width: 96px; min-height: 96px; padding: 12px; font-size: 2.375rem; }
+  .class-badge { --badge-step: 2px; min-width: 96px; min-height: 96px; padding: 12px; font-size: 2.375rem; }
   h1 { font-size: 1.625rem; }
   .chooser { padding: 15px; gap: 12px; }
 }
