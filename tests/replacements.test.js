@@ -1,0 +1,7 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {parseReplacementRows,normalizeDate} from '../src/replacements.js';
+import fs from 'node:fs';
+test('Russian spreadsheet headers and dates produce a targeted replacement',()=>{assert.deepEqual(parseReplacementRows([['Замены на неделю'],['Дата','Класс','№ урока','Замена','Кто заменяет','Кабинет','Кого заменяют'],['11.11.2026','9 ц',3,'Физика','Учитель А.А.','2.40','Учитель Б.Б.']]),[{date:'2026-11-11',className:'9Ц',lesson:3,subject:'Физика',teacher:'Учитель А.А.',room:'2.40',originalTeacher:'Учитель Б.Б.'}])});
+test('invalid dates and malformed rows are rejected without partial application',()=>{assert.equal(normalizeDate('31.02.2026'),null);assert.throws(()=>parseReplacementRows([['Дата','Класс','Урок','Предмет'],['11.11.2026','9Ц',3,'Физика'],['11.11.2026','9Ц',20,'Физика']]),/строки 3/);assert.throws(()=>parseReplacementRows([['Непонятный заголовок']]),/столбцы/)});
+test('all imported timetable entries refer to real lesson slots and contain teachers',()=>{const d=JSON.parse(fs.readFileSync('public/data/schedule.json'));assert.equal(Object.keys(d.classes).length,70);assert.equal(d.unparsed.length,0);assert.equal(d.bells.length,10);let count=0;for(const days of Object.values(d.classes))for(const [day,lessons]of Object.entries(days)){assert(+day>=0&&+day<=5);for(const [slot,items]of Object.entries(lessons)){assert(+slot>=1&&+slot<=10);for(const item of items){assert(item.teacher);assert(item.subject);count++}}}assert.equal(count,4234)});
