@@ -1,11 +1,47 @@
 {
   "version": 2,
   "sourceUrl": "https://docs.google.com/spreadsheets/d/1vIOpBDYYJlVAnTNHKAvS8YBsIMK8wjV6HU3EACIqJSs/edit",
-  "fetchedAt": "2026-11-11T12:00:40.720Z",
+  "fetchedAt": "2026-11-11T12:21:15.148Z",
   "sheets": [
     "1-30 сентября 2026",
     "1-30 октября 2026",
     "1-30 ноября 2026"
+  ],
+  "sheetReports": [
+    {
+      "name": "1-30 сентября 2026",
+      "declaredMonth": "2026-09",
+      "rowCount": 1350,
+      "monthCounts": {
+        "2026-09": 1350
+      },
+      "firstDate": "2026-09-01",
+      "lastDate": "2026-09-30",
+      "otherMonthRows": 0
+    },
+    {
+      "name": "1-30 октября 2026",
+      "declaredMonth": "2026-10",
+      "rowCount": 921,
+      "monthCounts": {
+        "2026-10": 921
+      },
+      "firstDate": "2026-10-01",
+      "lastDate": "2026-10-23",
+      "otherMonthRows": 0
+    },
+    {
+      "name": "1-30 ноября 2026",
+      "declaredMonth": "2026-11",
+      "rowCount": 1009,
+      "monthCounts": {
+        "2026-10": 920,
+        "2026-11": 89
+      },
+      "firstDate": "2026-10-01",
+      "lastDate": "2026-11-05",
+      "otherMonthRows": 920
+    }
   ],
   "coverage": [
     "2026-09-01",

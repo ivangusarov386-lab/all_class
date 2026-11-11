@@ -312,3 +312,46 @@ summary { font-size: var(--font-small); cursor: pointer; }
 .source-review li { padding: 10px 0; border-top: 1px solid var(--line); font-size: var(--font-small); }
 .source-review strong, .source-review span, .source-review small { display: block; }
 .source-review span, .source-review small { margin-top: 4px; color: var(--muted); }
+
+[hidden] { display: none !important; }
+.field .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.calendar-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 22px 30px 0; }
+.month-field { flex: 1; max-width: 240px; }
+.month-field select { height: 40px; font-size: 0.875rem; text-transform: capitalize; background-color: #fff9f3; }
+.calendar-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex-shrink: 0; min-height: 40px; padding: 8px 12px; border: 1px solid #efcfb5; border-radius: 9px; color: var(--accent); background: #fff6ed; font-size: var(--font-small); font-weight: 500; }
+.calendar-toggle[aria-expanded="true"] { background: #ffe4ce; border-color: #e8a16d; }
+.calendar-heading { padding-top: 18px; }
+.month-panel { margin: 0 30px 24px; padding: 16px; border: 1px solid var(--accent-border); border-radius: 14px; background: #fffaf6; }
+.month-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; color: var(--muted); font-size: var(--font-small); }
+.month-controls { display: flex; gap: 6px; }
+.month-controls button { width: 36px; height: 34px; border: 1px solid #eed4bd; border-radius: 8px; background: #fff; color: var(--accent); font-size: 1.125rem; line-height: 1; }
+.month-weekdays, .month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.month-weekdays { margin-bottom: 8px; color: var(--muted); font-size: var(--font-small); text-align: center; }
+.month-day { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-height: 56px; padding: 8px 2px 6px; border: 1px solid transparent; border-radius: 9px; background: #fff; color: var(--ink); font-size: 1rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+.month-day.outside-month { background: transparent; color: #9b887b; }
+.month-day.today { border-color: var(--accent); }
+.month-day.selected { background: var(--accent); color: #fff; }
+.date-markers { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 5px; }
+.replacement-marker, .pending-marker { display: inline-block; flex-shrink: 0; width: 5px; height: 5px; border-radius: 50%; }
+.replacement-marker { background: #ba3044; }
+.pending-marker { background: #a97516; }
+.month-day.selected .replacement-marker { background: #fff; }
+.month-day.selected .pending-marker { background: #ffe0a5; }
+.calendar-legend { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 15px; color: var(--muted); font-size: var(--font-note); }
+.calendar-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.month-data-note { margin-top: 12px; color: var(--muted); font-size: var(--font-note); line-height: 1.6; }
+.sheet-reports { list-style: none; padding: 0; margin: 12px 0 20px; }
+.sheet-reports li { padding: 11px 0; border-bottom: 1px solid var(--line); font-size: var(--font-small); line-height: 1.6; }
+.sheet-reports strong, .sheet-reports span { display: block; }
+.sheet-reports span { margin-top: 3px; color: var(--muted); }
+.sheet-reports .sheet-month-note { color: #96510a; }
+@media (max-width: 680px) {
+  .calendar-toolbar { gap: 10px; padding: 18px 18px 0; }
+  .month-field { max-width: 210px; }
+  .month-field select { padding-left: 10px; font-size: var(--font-small); }
+  .calendar-toggle { padding: 8px 10px; gap: 5px; font-size: var(--font-note); }
+  .calendar-heading { padding-top: 16px; }
+  .month-panel { margin: 0 15px 20px; padding: 12px 9px; }
+  .month-weekdays, .month-grid { gap: 4px; }
+  .month-day { min-height: 45px; padding: 6px 1px; border-radius: 7px; font-size: 0.9375rem; }
+}

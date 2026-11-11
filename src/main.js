@@ -1,10 +1,10 @@
 import { EXPORT_URL, SHEET_URL, readReplacementWorkbook, teacherKey } from './replacements.js';
+import { dateKey, monthKey, dateInMonth, shiftMonth, monthGrid, monthOptions } from './calendar.js';
 
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
 const save = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
-const dateKey = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const today = () => new Date(new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Moscow' }).format(new Date()) + 'T12:00:00');
 const fmt = (date, options) => new Intl.DateTimeFormat('ru-RU', options).format(date);
 const shortDate = key => fmt(new Date(key + 'T12:00:00'), { day: 'numeric', month: 'long' });
@@ -12,11 +12,42 @@ const plural = (n, one, few, many) => `${n} ${n % 100 >= 11 && n % 100 <= 14 ? m
 const externalIcon = '<svg class="inline-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M7 17 17 7M7 7h10v10"/></svg>';
 const logoURL = new URL('../assets/school-emblem.svg', import.meta.url).href;
 const empty = () => ({ version: 2, entries: [], unresolved: [], coverage: [], sheets: [], stats: {} });
-let selected = today(), data, snapshot = empty(), replacements = empty();
+let selected = today(), calendarOpen = false, data, snapshot = empty(), replacements = empty();
 let className = read('school-class', '9Ц'), origin = 'snapshot', busy = false, failure = '', importMessage = '';
 const validDataset = value => value?.version === 2 && Array.isArray(value.entries) && Array.isArray(value.unresolved) && Array.isArray(value.coverage);
 
 function move(days) { selected.setDate(selected.getDate() + days); render(); }
+function selectDate(key) {
+  const wasOpen = calendarOpen;
+  selected = new Date(key + 'T12:00:00'); calendarOpen = false; render();
+  if (wasOpen) $('#toggle-calendar').focus({ preventScroll: true });
+}
+function changeMonth(key) { selected = dateInMonth(selected, key); calendarOpen = true; render(); }
+function moveMonth(delta) { selected = shiftMonth(selected, delta); calendarOpen = true; render(); }
+
+function monthPanelHTML(counts) {
+  const selectedKey = dateKey(selected), currentKey = dateKey(today());
+  const monthLabel = fmt(selected, { month: 'long', year: 'numeric' }).replace(' г.', '');
+  const hasSourceData = replacements.coverage.some(key => key.startsWith(monthKey(selected)));
+  return `<div class="month-panel-heading"><span>Выберите дату</span><div class="month-controls"><button id="month-prev" aria-label="Предыдущий месяц">←</button><button id="month-next" aria-label="Следующий месяц">→</button></div></div>
+    <div class="month-weekdays" aria-hidden="true">${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(day => `<span>${day}</span>`).join('')}</div>
+    <div class="month-grid" role="group" aria-label="Даты: ${esc(monthLabel)}">${monthGrid(selected).map(cell => {
+      const count = counts.get(cell.key) || { changes: 0, pending: 0 };
+      const label = fmt(cell.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + (count.changes ? ', ' + plural(count.changes, 'замена', 'замены', 'замен') : '') + (count.pending ? ', ' + plural(count.pending, 'запись для уточнения', 'записи для уточнения', 'записей для уточнения') : '');
+      return `<button id="calendar-day-${cell.key}" data-date="${cell.key}" class="month-day ${cell.outside ? 'outside-month' : ''} ${cell.key === selectedKey ? 'selected' : ''} ${cell.key === currentKey ? 'today' : ''}" aria-label="${esc(label)}" aria-pressed="${cell.key === selectedKey}" ${cell.key === currentKey ? 'aria-current="date"' : ''}><span>${cell.date.getDate()}</span><span class="date-markers">${count.changes ? '<i class="replacement-marker"></i>' : ''}${count.pending ? '<i class="pending-marker"></i>' : ''}</span></button>`;
+    }).join('')}</div>
+    <div class="calendar-legend"><span><i class="replacement-marker"></i>Замены ${esc(className)}</span><span><i class="pending-marker"></i>Нужно уточнить</span></div>
+    ${hasSourceData ? '' : '<p class="month-data-note">В таблице пока нет записей за этот месяц. Доступно основное расписание.</p>'}`;
+}
+
+function sheetReportsHTML() {
+  const reports = replacements.sheetReports || [];
+  if (!reports.length) return (replacements.sheets || []).map(name => `<p class="small">${esc(name)}</p>`).join('');
+  const monthLabel = key => fmt(new Date(key + '-01T12:00:00'), { month: 'long', year: 'numeric' }).replace(' г.', '');
+  const fullDate = key => fmt(new Date(key + 'T12:00:00'), { day: 'numeric', month: 'short', year: 'numeric' });
+  return `<ul class="sheet-reports">${reports.map(report => `<li><strong>${esc(report.name)}</strong><span>${report.firstDate ? `Даты записей: ${fullDate(report.firstDate)} — ${fullDate(report.lastDate)}.` : 'Заполненных дат пока нет.'}</span><span>${Object.entries(report.monthCounts).map(([key, count]) => `${monthLabel(key)}: ${plural(count, 'строка', 'строки', 'строк')}`).join('; ')}</span>${report.otherMonthRows ? `<span class="sheet-month-note">${plural(report.otherMonthRows, 'строка относится', 'строки относятся', 'строк относятся')} к другим месяцам. Учитываются даты самих записей.</span>` : ''}</li>`).join('')}</ul>`;
+}
+
 function updateClass(value) { className = value; save('school-class', className); render(); }
 function syncStatus() {
   const label = origin === 'file' ? 'Загруженный файл' : origin === 'google' ? 'Google Таблицы' : 'Сохранённая копия таблицы';
@@ -31,6 +62,16 @@ function render() {
   const classes = Object.keys(data.classes).sort((a, b) => parseInt(a) - parseInt(b) || a.localeCompare(b, 'ru'));
   if (!classes.includes(className)) className = classes[0];
   const grade = parseInt(className), grades = [...new Set(classes.map(name => parseInt(name)))];
+  const sourceMonths = [...new Set([...replacements.coverage.map(key => key.slice(0, 7)), ...(replacements.sheetReports || []).map(report => report.declaredMonth).filter(Boolean)])];
+  const months = monthOptions(today(), selected, sourceMonths);
+  const dayCounts = new Map();
+  for (const [name, rows] of [['changes', replacements.entries], ['pending', replacements.unresolved]]) {
+    for (const row of rows) {
+      if (row.className !== className || !row.date) continue;
+      if (!dayCounts.has(row.date)) dayCounts.set(row.date, { changes: 0, pending: 0 });
+      dayCounts.get(row.date)[name]++;
+    }
+  }
   const key = dateKey(selected), isToday = key === dateKey(today()), day = (selected.getDay() + 6) % 7;
   const slots = data.classes[className][String(day)] || {};
   const changes = replacements.entries.filter(row => row.className === className && row.date === key);
@@ -57,8 +98,10 @@ function render() {
           <div class="field class-field"><label for="class-select">Класс</label><select id="class-select">${classes.filter(name => parseInt(name) === grade).map(name => `<option value="${esc(name)}" ${name === className ? 'selected' : ''}>${esc(name)}</option>`).join('')}</select></div>
         </section>
         <section class="calendar">
-          <div class="calendar-heading"><div><p class="month">${esc(fmt(selected, { month: 'long', year: 'numeric' }).replace(' г.', ''))}</p><h2>${isToday ? 'Сегодня' : esc(fmt(selected, { weekday: 'long' }))}<span class="date-label">${shortDate(key)}</span></h2></div><div class="day-controls"><button id="today">Сегодня</button><button id="prev" aria-label="Предыдущий день">←</button><button id="next" aria-label="Следующий день">→</button></div></div>
-          <div class="week" aria-label="Дни недели">${Array.from({ length: 7 }, (_, index) => {
+          <div class="calendar-toolbar"><div class="field month-field"><label class="sr-only" for="month-select">Месяц расписания</label><select id="month-select">${months.map(month => `<option value="${month}" ${month === monthKey(selected) ? 'selected' : ''}>${esc(fmt(new Date(month + '-01T12:00:00'), { month: 'long', year: 'numeric' }).replace(' г.', ''))}</option>`).join('')}</select></div><button id="toggle-calendar" class="calendar-toggle" aria-label="${calendarOpen ? 'Скрыть календарь' : 'Открыть календарь'}" aria-controls="month-panel" aria-expanded="${calendarOpen}"><svg class="inline-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18"/></svg> Даты <span aria-hidden="true">${calendarOpen ? '⌃' : '⌄'}</span></button></div>
+          <div class="calendar-heading"><div><h2>${isToday ? 'Сегодня' : esc(fmt(selected, { weekday: 'long' }))}<span class="date-label">${shortDate(key)}</span></h2></div><div class="day-controls"><button id="today">Сегодня</button><button id="prev" aria-label="Предыдущий день">←</button><button id="next" aria-label="Следующий день">→</button></div></div>
+          <div id="month-panel" class="month-panel" ${calendarOpen ? '' : 'hidden'}>${calendarOpen ? monthPanelHTML(dayCounts) : ''}</div>
+          <div class="week" aria-label="Дни недели" ${calendarOpen ? 'hidden' : ''}>${calendarOpen ? '' : Array.from({ length: 7 }, (_, index) => {
             const date = new Date(week); date.setDate(date.getDate() + index);
             return `<button data-date="${dateKey(date)}" aria-pressed="${dateKey(date) === key}" class="week-day ${dateKey(date) === key ? 'selected' : ''} ${dateKey(date) === dateKey(today()) ? 'is-today' : ''}"><span>${fmt(date, { weekday: 'short' })}</span><strong>${date.getDate()}</strong><i></i></button>`;
           }).join('')}</div>
@@ -78,6 +121,8 @@ function render() {
       <h3>Замены из Google Таблиц</h3>
       <p>Обновляются при открытии сайта и каждые 5 минут, пока страница открыта. При отсутствии сети остаётся последняя сохранённая копия. ${latest ? `Последняя дата с записями: ${shortDate(latest)}.` : ''}</p>
       <p>Сопоставлено ${plural(replacements.entries.length, 'занятие', 'занятия', 'занятий')}. Для уточнения: ${plural(replacements.unresolved.length, 'запись', 'записи', 'записей')}. Классы, отсутствующие в основном расписании, пропущены.</p>
+      <h3>Проверенные листы</h3>
+      ${sheetReportsHTML()}
       <a href="${SHEET_URL}" target="_blank" rel="noreferrer">Открыть таблицу замен ${externalIcon}</a>
       <label class="upload">Загрузить XLSX или CSV<input id="import-file" type="file" accept=".xlsx,.xls,.csv"></label>
       <p class="small">Можно загрузить исходную школьную таблицу целиком или файл по шаблону. Диапазоны уроков распознаются. Номер отсутствующего урока определяется только при однозначном совпадении. После ручного импорта автоматическое обновление приостанавливается; кнопка «Обновить замены» снова загрузит Google Таблицу.</p>
@@ -89,10 +134,15 @@ function render() {
     </dialog>`;
   $('#grade').onchange = event => updateClass(classes.find(name => parseInt(name) === +event.target.value));
   $('#class-select').onchange = event => updateClass(event.target.value);
-  document.querySelectorAll('[data-date]').forEach(button => button.onclick = () => { selected = new Date(button.dataset.date + 'T12:00:00'); render(); });
+  document.querySelectorAll('[data-date]').forEach(button => button.onclick = () => selectDate(button.dataset.date));
+  $('#month-select').onchange = event => changeMonth(event.target.value);
+  $('#toggle-calendar').onclick = () => { calendarOpen = !calendarOpen; render(); };
+  if ($('#month-prev')) $('#month-prev').onclick = () => moveMonth(-1);
+  if ($('#month-next')) $('#month-next').onclick = () => moveMonth(1);
+  $('#month-panel').onkeydown = event => { if (event.key === 'Escape') { calendarOpen = false; render(); $('#toggle-calendar').focus(); } };
   $('#prev').onclick = () => move(-1); $('#next').onclick = () => move(1);
-  $('#today').onclick = () => { selected = today(); render(); };
-  if ($('#last-changes')) $('#last-changes').onclick = () => { selected = new Date(lastDate + 'T12:00:00'); render(); };
+  $('#today').onclick = () => selectDate(dateKey(today()));
+  if ($('#last-changes')) $('#last-changes').onclick = () => selectDate(lastDate);
   if ($('#next-school')) $('#next-school').onclick = () => { for (let i = 0; i < 7; i++) { selected.setDate(selected.getDate() + 1); if (Object.keys(data.classes[className][String((selected.getDay() + 6) % 7)] || {}).length) break; } render(); };
   $('#settings').onclick = $('#details').onclick = () => $('#source-dialog').showModal();
   $('#close-dialog').onclick = () => $('#source-dialog').close();
@@ -100,7 +150,7 @@ function render() {
   $('#clear').onclick = () => { replacements = snapshot; origin = 'snapshot'; failure = ''; save('school-replacements-v2', null); importMessage = 'Локальный импорт сброшен. Показана школьная таблица.'; render(); };
   let touch;
   $('.calendar').addEventListener('touchstart', event => { touch = event.changedTouches[0]; }, { passive: true });
-  $('.calendar').addEventListener('touchend', event => { const point = event.changedTouches[0]; if (touch && Math.abs(point.clientX - touch.clientX) > 70 && Math.abs(point.clientY - touch.clientY) < 60) move(point.clientX < touch.clientX ? 1 : -1); }, { passive: true });
+  $('.calendar').addEventListener('touchend', event => { const point = event.changedTouches[0]; if (touch && Math.abs(point.clientX - touch.clientX) > 70 && Math.abs(point.clientY - touch.clientY) < 60) { const direction = point.clientX < touch.clientX ? 1 : -1; if (calendarOpen) moveMonth(direction); else move(direction); } }, { passive: true });
   if (dialogOpen) $('#source-dialog').showModal();
   if (focused && document.getElementById(focused)) document.getElementById(focused).focus({ preventScroll: true });
 }

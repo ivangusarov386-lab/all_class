@@ -79,9 +79,18 @@ function findHeader(rows) {
   throw Error('Не найдены столбцы «Дата», «Класс» и «Урок».');
 }
 
+export function declaredSheetMonth(name) {
+  const found = folded(name).match(/(январ[ья]|феврал[ья]|марта?|апрел[ья]|ма[йя]|июн[ья]|июл[ья]|августа?|сентябр[ья]|октябр[ья]|ноябр[ья]|декабр[ья])\s+(\d{4})/);
+  if (!found) return null;
+  const stems = ['январ', 'феврал', 'март', 'апрел', 'ма', 'июн', 'июл', 'август', 'сентябр', 'октябр', 'ноябр', 'декабр'];
+  const month = stems.findIndex(stem => found[1].startsWith(stem)) + 1;
+  return `${found[2]}-${String(month).padStart(2, '0')}`;
+}
+
 function recordsFromSheet({ name, rows }) {
   const { index, columns } = findHeader(rows);
   const records = [], issues = [];
+  const dateCounts = new Map();
   let rowCount = 0;
   for (let offset = index + 1; offset < rows.length; offset++) {
     const row = rows[offset];
@@ -104,6 +113,7 @@ function recordsFromSheet({ name, rows }) {
       expectedCount: Number(clean(get('className')).match(/\((\d+)\s*урок/i)?.[1] || 0),
       source,
     };
+    if (record.date) dateCounts.set(record.date, (dateCounts.get(record.date) || 0) + 1);
     const classes = parseClasses(record.sourceClass);
     if (!record.date || !classes.length || (!record.teacher && !record.subject)) {
       issues.push({ ...record, className: classes[0] || '', reason: 'Не распознаны дата, класс или содержание замены.' });
@@ -113,7 +123,16 @@ function recordsFromSheet({ name, rows }) {
     catch (error) { for (const className of classes) issues.push({ ...record, className, reason: error.message }); continue; }
     for (const className of classes) records.push({ ...record, className });
   }
-  return { records, issues, rowCount };
+  const dates = [...dateCounts.keys()].sort();
+  const declaredMonth = declaredSheetMonth(name);
+  const monthCounts = {};
+  for (const [date, count] of dateCounts) monthCounts[date.slice(0, 7)] = (monthCounts[date.slice(0, 7)] || 0) + count;
+  return { records, issues, rowCount, report: {
+    name, declaredMonth, rowCount, monthCounts,
+    firstDate: dates[0] || null, lastDate: dates.at(-1) || null,
+    otherMonthRows: declaredMonth ? [...dateCounts].filter(([date]) => !date.startsWith(declaredMonth)).reduce((sum, [, count]) => sum + count, 0) : 0,
+  } };
+
 }
 
 function daySlots(schedule, record) {
@@ -153,10 +172,11 @@ function identity(record) {
 
 export function connectReplacementSheets(sheets, schedule, { fetchedAt = new Date().toISOString() } = {}) {
   let entries = [], unresolved = [], sourceRows = 0, duplicateRows = 0, duplicateLessons = 0, outsideSchedule = 0;
-  const unique = new Map(), coverage = new Set();
+  const unique = new Map(), coverage = new Set(), sheetReports = [];
   for (const sheet of sheets) {
     const parsed = recordsFromSheet(sheet);
     sourceRows += parsed.rowCount;
+    sheetReports.push(parsed.report);
     for (const issue of parsed.issues) {
       if (issue.className && !schedule.classes[issue.className]) { outsideSchedule++; continue; }
       unresolved.push(issue);
@@ -213,7 +233,7 @@ export function connectReplacementSheets(sheets, schedule, { fetchedAt = new Dat
   entries.sort((a, b) => a.date.localeCompare(b.date) || a.className.localeCompare(b.className, 'ru') || a.lesson - b.lesson);
   return {
     version: 2, sourceUrl: SHEET_URL, fetchedAt,
-    sheets: sheets.map(sheet => sheet.name), coverage: [...coverage].sort(), entries, unresolved,
+    sheets: sheets.map(sheet => sheet.name), sheetReports, coverage: [...coverage].sort(), entries, unresolved,
     stats: { sourceRows, duplicateRows, duplicateLessons, outsideSchedule, matchedLessons: entries.length, unresolved: unresolved.length },
   };
 }

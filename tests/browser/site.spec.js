@@ -134,3 +134,71 @@ test('Google refresh reads the school schema and caches the result for a reload 
   await expect(page.locator('#sync-status')).toContainText('Не удалось обновить');
   await expect(page.locator('.replacement p').filter({ hasText: 'Учитель из Google' })).toHaveCount(2);
 });
+
+test('month selection opens a full grid above lessons and date selection opens real replacements', async ({ page }) => {
+  await page.goto('./');
+  await expect(page.locator('#month-select')).toHaveValue('2026-11');
+  await page.selectOption('#month-select', '2026-09');
+  await expect(page.locator('#toggle-calendar')).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('.month-day:not(.outside-month)')).toHaveCount(30);
+  await expect(page.locator('#calendar-day-2026-09-25 .replacement-marker')).toBeVisible();
+  await page.locator('#calendar-day-2026-09-25').click();
+  await expect(page.locator('#month-panel')).toBeHidden();
+  await expect(page.locator('.calendar h2')).toContainText('25 сентября');
+  await expect(page.locator('.replacement')).toHaveCount(3);
+  await expect(page.locator('#class-select')).toHaveValue('9Ц');
+  await page.locator('#toggle-calendar').click();
+  await page.locator('#month-prev').click();
+  await expect(page.locator('#month-select')).toHaveValue('2026-08');
+  await page.locator('#month-next').click();
+  await expect(page.locator('#month-select')).toHaveValue('2026-09');
+  await page.locator('#month-next').focus();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#month-panel')).toBeHidden();
+  await expect(page.locator('#toggle-calendar')).toBeFocused();
+});
+
+test('month and year navigation handle short months without skipping dates or losing the class', async ({ page }) => {
+  await page.goto('./');
+  await page.selectOption('#grade', '11');
+  await page.selectOption('#class-select', '11Ш');
+  await page.selectOption('#month-select', '2026-01');
+  await page.locator('#calendar-day-2026-01-31').click();
+  await page.selectOption('#month-select', '2026-02');
+  await expect(page.locator('.calendar h2')).toContainText('28 февраля');
+  await expect(page.locator('.month-day:not(.outside-month)')).toHaveCount(28);
+  await page.selectOption('#month-select', '2026-01');
+  await page.locator('#month-prev').click();
+  await expect(page.locator('#month-select')).toHaveValue('2025-12');
+  await expect(page.locator('#class-select')).toHaveValue('11Ш');
+  await page.locator('#today').click();
+  await expect(page.locator('#month-select')).toHaveValue('2026-11');
+  await expect(page.locator('#month-panel')).toBeHidden();
+  await expect(page.locator('.calendar h2')).toContainText('Сегодня');
+});
+
+test('source details list all monthly sheets and distinguish copied dates from the sheet name', async ({ page }) => {
+  await page.goto('./');
+  await page.locator('#settings').click();
+  await expect(page.locator('.sheet-reports li')).toHaveCount(3);
+  await expect(page.locator('.sheet-reports')).toContainText('1-30 сентября 2026');
+  await expect(page.locator('.sheet-reports')).toContainText('1-30 октября 2026');
+  await expect(page.locator('.sheet-reports')).toContainText('1-30 ноября 2026');
+  await expect(page.locator('.sheet-reports li').last()).toContainText('октябрь 2026');
+  await expect(page.locator('.sheet-month-note')).toContainText('Учитываются даты самих записей');
+});
+
+test('phone date grid stays within the screen and empty future months do not claim replacement coverage', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto('./');
+  await page.locator('#toggle-calendar').click();
+  await expect(page.locator('.month-weekdays span')).toHaveCount(7);
+  await expect(page.locator('.month-day:not(.outside-month)')).toHaveCount(30);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.locator('#calendar-day-2026-11-20').click();
+  await expect(page.locator('.calendar h2')).toContainText('20 ноября');
+  await page.selectOption('#month-select', '2027-03');
+  await expect(page.locator('.month-data-note')).toContainText('пока нет записей');
+  await expect(page.locator('.month-grid .replacement-marker')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

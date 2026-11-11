@@ -130,3 +130,25 @@ test('all imported timetable entries refer to real lesson slots and contain teac
   }
   assert.equal(count, 4234);
 });
+
+test('sheet audit identifies mixed months while retaining the actual dates of every record', () => {
+  const data = connect([
+    row({ date: '25.09.2026', original: 'Путилкина Н.П.', originalSubject: 'Информатика', lesson: '3', subject: 'Информатика' }),
+    row({ date: '05.11.2026' }),
+  ]);
+  assert.equal(data.sheetReports[0].declaredMonth, '2026-11');
+  assert.equal(data.sheetReports[0].otherMonthRows, 1);
+  assert.deepEqual(data.sheetReports[0].monthCounts, { '2026-09': 1, '2026-11': 1 });
+  assert.equal(data.sheetReports[0].firstDate, '2026-09-25');
+  assert.equal(data.sheetReports[0].lastDate, '2026-11-05');
+  assert(data.entries.some(row => row.date === '2026-09-25'));
+  assert(!data.entries.some(row => row.date === '2026-11-25'));
+});
+
+test('real workbook inventory includes September, October and November with copied October dates reported', () => {
+  const data = JSON.parse(fs.readFileSync('data/replacements.json'));
+  assert.deepEqual(data.sheetReports.map(report => report.declaredMonth), ['2026-09', '2026-10', '2026-11']);
+  assert(data.sheetReports[2].monthCounts['2026-10'] > 0);
+  assert(data.sheetReports[2].monthCounts['2026-11'] > 0);
+  assert(data.sheetReports[2].otherMonthRows > 0);
+});
