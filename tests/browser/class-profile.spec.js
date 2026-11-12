@@ -63,7 +63,7 @@ test('reset removes the class preference while preserving replacement data and o
   await rememberTestClass(page, baseURL, '9Ц');
   const data = JSON.parse(fs.readFileSync('data/replacements.json'));
   await page.addInitScript(data => {
-    localStorage.setItem('school-replacements-v3', JSON.stringify({ ...data, origin: 'file' }));
+    localStorage.setItem('school-replacements-v4', JSON.stringify({ ...data, origin: 'file' }));
     localStorage.setItem('other-setting', 'keep');
   }, data);
   await page.goto('./');
@@ -73,7 +73,7 @@ test('reset removes the class preference while preserving replacement data and o
   await expect(page.locator('#grade')).toHaveValue('');
   expect((await page.context().cookies()).some(cookie => cookie.name === CLASS_COOKIE_NAME)).toBe(false);
   expect(await page.evaluate(() => localStorage.getItem('other-setting'))).toBe('keep');
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('school-replacements-v3')).entries.length)).toBe(data.entries.length);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('school-replacements-v4')).entries.length)).toBe(data.entries.length);
   await chooseClass(page, '5А');
   await page.reload();
   await expect(page.locator('.class-badge')).toHaveText('5А');
@@ -104,7 +104,7 @@ test('a background Google refresh does not erase an unfinished class choice', as
   await page.goto('./');
   await page.selectOption('#grade', '6');
   release();
-  await page.waitForFunction(() => localStorage.getItem('school-replacements-v3') !== null);
+  await page.waitForFunction(() => localStorage.getItem('school-replacements-v4') !== null);
   await expect(page.locator('#class-dialog')).toBeVisible();
   await expect(page.locator('#grade')).toHaveValue('6');
   await expect(page.locator('#class-select')).toHaveValue('');

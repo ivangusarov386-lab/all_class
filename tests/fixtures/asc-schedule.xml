@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<timetable>
+  <periods>
+    <period period="1" starttime="8:30" endtime="9:15"/>
+    <period period="2" starttime="9:30" endtime="10:15"/>
+    <period period="3" starttime="10:30" endtime="11:15"/>
+  </periods>
+  <daysdefs>
+    <daysdef short="Пн" days="100000"/><daysdef short="Вт" days="010000"/>
+    <daysdef short="Ср" days="001000"/><daysdef short="Чт" days="000100"/>
+    <daysdef short="Пт" days="000010"/><daysdef short="Сб" days="000001"/>
+  </daysdefs>
+  <weeksdefs><weeksdef weeks="1"/></weeksdefs>
+  <termsdefs><termsdef terms="1"/></termsdefs>
+  <classes><class id="C1" name="6М-З"/><class id="C2" name="5А-З"/></classes>
+  <teachers>
+    <teacher id="T1" name="Иванова Ирина Ивановна" short="Иванова И.И." email="PRIVATE_EMAIL" mobile="PRIVATE_PHONE"/>
+    <teacher id="T2" name="Петров Пётр Петрович" short="Петров П.П."/>
+  </teachers>
+  <subjects><subject id="S1" name="Русский язык"/><subject id="S2" name="Литература"/><subject id="S3" name="История"/></subjects>
+  <classrooms><classroom id="R1" name="1.01"/><classroom id="R2" name="2.02"/></classrooms>
+  <groups>
+    <group id="G1" classid="C1" name="1" entireclass="0"/>
+    <group id="G2" classid="C1" name="2" entireclass="0"/>
+    <group id="G3" classid="C2" name="Весь класс" entireclass="1"/>
+    <group id="G4" classid="C1" name="Весь класс" entireclass="1"/>
+  </groups>
+  <lessons>
+    <lesson id="L1" subjectid="S1" classids="C1,C2" teacherids="T1,T2" groupids="G1,G3" classroomids="R1,R2" periodspercard="2"/>
+    <lesson id="L2" subjectid="S2" classids="C1" teacherids="T1" groupids="G2" classroomids="R1" periodspercard="1"/>
+    <lesson id="L3" subjectid="S3" classids="C1" teacherids="T1" groupids="G4" classroomids="R1" periodspercard="1"/>
+  </lessons>
+  <cards>
+    <card lessonid="L1" period="1" days="101000" weeks="1" terms="1" classroomids="R2"/>
+    <card lessonid="L2" period="3" days="000100" weeks="1" terms="1" classroomids=""/>
+  </cards>
+</timetable>

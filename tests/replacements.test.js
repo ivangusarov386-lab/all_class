@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { connectReplacementSheets, readReplacementWorkbook, normalizeDate, parseClasses, parseLessons } from '../src/replacements.js';
+import { connectReplacementSheets, readReplacementWorkbook, normalizeDate, parseClasses, parseLessons, isReplacementDatasetForSchedule } from '../src/replacements.js';
 import * as XLSX from '../vendor/xlsx.js';
 
 const schedule = JSON.parse(fs.readFileSync('data/schedule.json'));
@@ -157,7 +157,7 @@ test('the reported 6М replacement keeps November 5 for numeric Excel dates in b
   const { missingReplacementWorkbook } = await import('./fixtures/missing-replacement.js');
   for (const options of [{}, { date1904: true }, { fraction: 0.75 }]) {
     const data = await readReplacementWorkbook(missingReplacementWorkbook(options), schedule);
-    assert.equal(data.version, 3);
+    assert.equal(data.version, 4);
     assert.equal(data.unresolved.length, 0);
     assert.equal(data.entries.length, 1);
     const [entry] = data.entries;
@@ -168,5 +168,28 @@ test('the reported 6М replacement keeps November 5 for numeric Excel dates in b
     assert.equal(entry.room, '2.24');
     assert.deepEqual(entry.targetTeachers, ['Попова Ю.Н.']);
     assert.deepEqual(data.coverage, ['2026-11-05']);
+  }
+});
+
+test('resolved replacements belong to the exact base timetable and old caches cannot be reused', () => {
+  const data = connect([row()]);
+  assert.equal(data.scheduleRevision, schedule.revision);
+  assert.equal(isReplacementDatasetForSchedule(data, schedule), true);
+  assert.equal(isReplacementDatasetForSchedule({ ...data, scheduleRevision: 'previous-timetable', fetchedAt: '2099-01-01T00:00:00Z', origin: 'file' }, schedule), false);
+  assert.equal(isReplacementDatasetForSchedule({ ...data, version: 3 }, schedule), false);
+  assert.equal(isReplacementDatasetForSchedule({ ...data, scheduleRevision: undefined }, schedule), false);
+});
+
+test('XML subjects stay distinct when a replacement cannot match its original teacher', () => {
+  const cases = [
+    { date: '05.11.2026', className: '6М', lesson: '2', originalSubject: 'Русский язык' }, // XML: literature.
+    { date: '11.11.2026', className: '9Ц', lesson: '1', originalSubject: 'Геометрия' }, // XML: algebra.
+    { date: '09.11.2026', className: '5А', lesson: '5', originalSubject: 'Обществознание' }, // XML: history.
+  ];
+  for (const fields of cases) {
+    const data = connect([row({ ...fields, original: 'Вакансия', subject: fields.originalSubject })]);
+    assert.equal(data.entries.length, 0);
+    assert.equal(data.unresolved.length, 1);
+    assert.match(data.unresolved[0].reason, /не совпали/);
   }
 });

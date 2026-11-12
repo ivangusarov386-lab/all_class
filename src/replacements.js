@@ -1,7 +1,13 @@
 export const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1vIOpBDYYJlVAnTNHKAvS8YBsIMK8wjV6HU3EACIqJSs/edit';
 export const EXPORT_URL = SHEET_URL.replace('/edit', '/export?format=xlsx');
-// V2 caches may contain dates shifted by the browser's historical timezone offset.
-export const REPLACEMENT_DATA_VERSION = 3;
+// V4 binds resolved replacements to the exact base timetable used for matching.
+export const REPLACEMENT_DATA_VERSION = 4;
+export function isReplacementDatasetForSchedule(value, schedule) {
+  return value?.version === REPLACEMENT_DATA_VERSION
+    && typeof schedule?.revision === 'string' && !!schedule.revision
+    && value.scheduleRevision === schedule.revision
+    && Array.isArray(value.entries) && Array.isArray(value.unresolved) && Array.isArray(value.coverage);
+}
 const clean = value => String(value ?? '').trim();
 const folded = value => clean(value).toLowerCase().replace(/ё/g, 'е');
 const headerKey = value => folded(value).replace(/[^а-яa-z0-9№]/g, '');
@@ -52,10 +58,15 @@ export function parseLessons(value) {
 
 function subjectKey(value) {
   const key = headerKey(value);
-  if (['русскийязык', 'литература', 'русскийязыкилитература'].includes(key)) return 'русскийилитература';
-  if (['история', 'обществознание', 'историяиобществознание'].includes(key)) return 'историяиобществознание';
-  if (['алгебра', 'геометрия', 'математика', 'вероятностьистатистика'].includes(key)) return 'математика';
-  return key;
+  const aliases = {
+    иностранныйанглийскийязык: 'английскийязык',
+    второйиностранныйкитайскийязык: 'китайскийязык',
+    трудтехнология: 'технология',
+    алгебраиначматанализа: 'алгебраиначаламатематическогоанализа',
+    алгебраиначанализа: 'алгебраиначаламатематическогоанализа',
+    алгебраиначалаанализа: 'алгебраиначаламатематическогоанализа',
+  };
+  return aliases[key] || key;
 }
 
 function findHeader(rows) {
@@ -234,7 +245,7 @@ export function connectReplacementSheets(sheets, schedule, { fetchedAt = new Dat
   });
   entries.sort((a, b) => a.date.localeCompare(b.date) || a.className.localeCompare(b.className, 'ru') || a.lesson - b.lesson);
   return {
-    version: REPLACEMENT_DATA_VERSION, sourceUrl: SHEET_URL, fetchedAt,
+    version: REPLACEMENT_DATA_VERSION, scheduleRevision: schedule.revision, sourceUrl: SHEET_URL, fetchedAt,
     sheets: sheets.map(sheet => sheet.name), sheetReports, coverage: [...coverage].sort(), entries, unresolved,
     stats: { sourceRows, duplicateRows, duplicateLessons, outsideSchedule, matchedLessons: entries.length, unresolved: unresolved.length },
   };

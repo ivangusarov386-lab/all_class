@@ -1,4 +1,4 @@
-import { EXPORT_URL, SHEET_URL, REPLACEMENT_DATA_VERSION, readReplacementWorkbook, teacherKey } from './replacements.js?v=3';
+import { EXPORT_URL, SHEET_URL, REPLACEMENT_DATA_VERSION, readReplacementWorkbook, teacherKey, isReplacementDatasetForSchedule } from './replacements.js?v=4';
 import { dateKey, monthKey, dateInMonth, shiftMonth, monthGrid, monthOptions } from './calendar.js';
 import { readClassCookie, rememberClass, forgetClass } from './profile.js';
 
@@ -19,7 +19,7 @@ let selected = today(), calendarOpen = false, data, snapshot = empty(), replacem
 let className = '', setupGrade = '', setupClass = '', preferenceNotice = '';
 let origin = 'snapshot', busy = false, failure = '', importMessage = '';
 let sourcesUnlocked = false;
-const validDataset = value => value?.version === REPLACEMENT_DATA_VERSION && Array.isArray(value.entries) && Array.isArray(value.unresolved) && Array.isArray(value.coverage);
+const validDataset = value => isReplacementDatasetForSchedule(value, data);
 
 function move(days) { selected.setDate(selected.getDate() + days); render(); }
 function selectDate(key) {
@@ -147,6 +147,7 @@ function render() {
   const relevantDates = [...replacements.entries, ...replacements.unresolved].filter(row => row.className === className && row.date).map(row => row.date).sort();
   const lastDate = relevantDates.at(-1), latest = replacements.coverage.at(-1);
   const review = replacements.unresolved.filter(row => row.className === className || !row.className).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const unscheduled = (data.unscheduled || []).filter(row => row.className === className);
   const week = new Date(selected); week.setDate(week.getDate() - day);
   const coverageNote = !replacements.coverage.includes(key)
     ? `На ${shortDate(key)} в таблице пока нет записей замен. Показано основное расписание.`
@@ -169,6 +170,7 @@ function render() {
           <div class="calendar-action"><button id="toggle-calendar" class="calendar-toggle" aria-haspopup="dialog" aria-controls="calendar-dialog" aria-expanded="${calendarOpen}"><svg class="inline-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18"/></svg> Открыть календарь</button></div>
           <div class="schedule-meta"><div class="schedule-summary"><span class="selected-class">${esc(className)} класс</span><span>${numbers.length ? plural(numbers.length, 'урок', 'урока', 'уроков') : 'Нет занятий'}</span></div><span class="change-tag ${changes.length ? 'has-changes' : ''}">${badge}</span></div>
           ${coverageNote ? `<div class="coverage-note" role="status"><p>${esc(coverageNote)}</p>${lastDate && lastDate !== key ? `<button id="last-changes">Последние записи для класса: ${shortDate(lastDate)}</button>` : ''}</div>` : ''}
+          ${unscheduled.length ? `<section class="unmatched unscheduled" role="status"><h3>Нужно уточнить время занятия</h3><p>В основном расписании для этих занятий не назначены день и номер урока:</p><ul>${unscheduled.map(row => `<li><strong>${esc(row.subject)}</strong><span>${esc(row.teacher)}</span></li>`).join('')}</ul></section>` : ''}
           ${pending.length ? `<section class="unmatched"><h3>Нужно уточнить ${plural(pending.length, 'запись', 'записи', 'записей')}</h3><p>Эти замены есть в таблице, но пока не привязаны к конкретному занятию.</p><ul>${pending.map(row => `<li><strong>${row.lesson ? row.lesson + ' урок · ' : ''}${row.cancelled ? 'Отмена · ' : ''}${esc(row.subject || row.originalSubject || 'Предмет не указан')}</strong><span>${esc(row.teacher || 'Учитель не указан')}${row.room ? ' · Каб. ' + esc(row.room) : ''}</span><span>${esc(row.reason)}</span><small>${esc(row.source?.sheet)} · строка ${esc(row.source?.row)}</small></li>`).join('')}</ul></section>` : ''}
           <div class="lessons" id="lessons">${numbers.length ? numbers.map(number => lessonHTML(number, slots[String(number)] || [], changes.filter(row => row.lesson === number))).join('') : `<div class="empty"><span aria-hidden="true">☀</span><h3>${day === 6 ? 'Воскресенье. Можно выдохнуть.' : 'На этот день уроков нет'}</h3><p>В исходном расписании занятия не указаны.</p><button id="next-school">Следующий учебный день</button></div>`}</div>
           <div class="sync-bar"><div><span class="status-dot ${failure ? '' : 'loaded'}"></span><span id="sync-status" role="status">${esc(syncStatus())}</span></div><button id="refresh" ${busy ? 'disabled' : ''}>${busy ? 'Загрузка…' : '↻ Обновить замены'}</button></div>
@@ -194,7 +196,8 @@ function render() {
     </dialog>
     ${sourcesUnlocked ? `<dialog id="source-dialog" aria-label="Источники расписания">
       <div class="dialog-header"><h2>Источники расписания</h2><button id="close-dialog" aria-label="Закрыть">×</button></div>
-      <p>Основное расписание: ${classes.length} классов, понедельник — суббота. Загружено из вашей таблицы Excel.</p>
+      <p>Основное расписание: ${classes.length} классов, понедельник — суббота. Источник: ${esc(data.source)} · ${esc(data.format)}.</p>
+      ${(data.unscheduled || []).length ? `<h3>Занятия без назначенного времени</h3><p>${data.unscheduled.map(row => `${esc(row.className)} · ${esc(row.subject)} · ${esc(row.teacher)}`).join('<br>')}. День и номер урока не назначены в исходном XML.</p>` : ''}
       <h3>Замены из Google Таблиц</h3>
       <p>Обновляются при открытии сайта и каждые 5 минут, пока страница открыта. При отсутствии сети остаётся последняя сохранённая копия. ${latest ? `Последняя дата с записями: ${shortDate(latest)}.` : ''}</p>
       <p>Сопоставлено ${plural(replacements.entries.length, 'занятие', 'занятия', 'занятий')}. Для уточнения: ${plural(replacements.unresolved.length, 'запись', 'записи', 'записей')}. Классы, отсутствующие в основном расписании, пропущены.</p>
@@ -286,10 +289,11 @@ function lessonHTML(number, items, changes) {
   let content = items.map(item => {
     const matching = changes.filter(row => row.targetTeachers.includes(item.teacher));
     const labels = matching.filter(row => !shown.has(row)).map(row => { shown.add(row); return replacementHTML(row); }).join('');
-    return `${labels}<div class="original ${matching.length ? 'crossed' : ''}"><h3>${esc(item.subject)}</h3><p>${esc(item.teacher)}${item.room ? ' · Каб. ' + esc(item.room) : ''}</p></div>`;
+    const groups = item.groups?.length ? ` · ${item.groups.length > 1 ? 'Группы' : 'Группа'} ${esc(item.groups.join(', '))}` : '';
+    return `${labels}<div class="original ${matching.length ? 'crossed' : ''}"><h3>${esc(item.subject)}</h3><p>${esc(item.teacher)} · ${item.room ? 'Каб. ' + esc(item.room) : 'Кабинет не указан'}${groups}</p></div>`;
   }).join('');
   content += changes.filter(row => !shown.has(row)).map(replacementHTML).join('');
-  return `<article class="lesson ${changes.length ? 'changed' : ''}"><div class="lesson-time"><strong>${esc(bell.start)}</strong><span>${esc(bell.end)}</span></div><div class="lesson-number">${number}</div><div class="lesson-content">${content}${items.length > 1 ? '<span class="group-note">Учителя / подгруппы из основного расписания</span>' : ''}</div></article>`;
+  return `<article class="lesson ${changes.length ? 'changed' : ''}"><div class="lesson-time"><strong>${esc(bell.start)}</strong><span>${esc(bell.end)}</span></div><div class="lesson-number">${number}</div><div class="lesson-content">${content}</div></article>`;
 }
 
 async function importFile(event) {
@@ -319,7 +323,7 @@ async function sync({ quiet = false } = {}) {
 
 async function init() {
   try {
-    const response = await fetch(new URL('../data/schedule.json', import.meta.url));
+    const response = await fetch(new URL('../data/schedule.json', import.meta.url), { cache: 'no-store' });
     if (!response.ok) throw Error();
     data = await response.json();
     const savedClass = readClassCookie();
@@ -333,8 +337,9 @@ async function init() {
       if (validDataset(result)) snapshot = result;
     } catch {}
     const cached = read(CACHE_KEY, null);
-    if (!cached && read('school-replacements-v2', null)?.origin === 'file') {
-      importMessage = 'Старый локальный импорт не используется из-за ошибки дат. Показана школьная таблица; при необходимости загрузите свой файл заново.';
+    const legacyImport = [cached, read('school-replacements-v3', null), read('school-replacements-v2', null)].some(value => value?.origin === 'file');
+    if (!validDataset(cached) && legacyImport) {
+      importMessage = 'Основное расписание обновлено. Старый локальный импорт нужно загрузить заново для сопоставления с новыми уроками. Сейчас показана школьная таблица замен.';
     }
     if (validDataset(cached) && (cached.origin === 'file' || (Date.parse(cached.fetchedAt) || 0) > (Date.parse(snapshot.fetchedAt) || 0))) {
       replacements = cached; origin = cached.origin === 'file' ? 'file' : 'google';

@@ -231,7 +231,7 @@ for (const timezone of ['Europe/Moscow', 'America/New_York', 'Asia/Kathmandu']) 
       await expect(fourth.locator('.replacement p')).toContainText('Шурухина О.С. · Каб. 2.24');
       await expect(fourth.locator('.crossed p')).toContainText('Попова Ю.Н.');
       await expect(page.locator('.coverage-note')).toHaveCount(0);
-      const cache = await page.evaluate(() => JSON.parse(localStorage.getItem('school-replacements-v3')));
+      const cache = await page.evaluate(() => JSON.parse(localStorage.getItem('school-replacements-v4')));
       expect(cache.coverage).toEqual(['2026-11-05']);
       expect(cache.entries[0].date).toBe('2026-11-05');
       await page.route('https://docs.google.com/spreadsheets/d/**/export?format=xlsx', route => route.abort('internetdisconnected'));
