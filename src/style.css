@@ -456,12 +456,13 @@ dialog.class-setup::backdrop { background: #fff2e2b8; backdrop-filter: blur(4px)
 }
 
 .lesson-note-area { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 10px; min-width: 0; }
-.note-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 5px 10px; border: 1px solid #efd3bb; border-radius: 8px; background: #fff9f3; color: #a34210; font-size: var(--font-note); font-weight: 500; }
+.note-button { float: right; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin: -4px -10px 0 2px; padding: 5px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #a34210; }
 .note-button.has-note { background: #ffedda; border-color: #eab481; }
 .note-button:hover { background: #ffe8d2; }
 .subject-note { width: 100%; padding: 9px 12px; border: 1px solid #f0d7b6; border-left: 3px solid #e48b32; border-radius: 8px; background: #fff8e9; }
 .subject-note-label { display: block; color: #9d5b14; font-size: var(--font-note); font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
 .lesson .subject-note-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; margin-top: 4px; color: #5c4938; font-size: var(--font-small); line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.lesson .subject-note-text:first-child { margin-top: 0; }
 dialog.note-dialog { max-width: 520px; max-height: calc(100dvh - 24px); padding: 26px; }
 .note-class { display: inline-block; margin-top: 14px; padding: 4px 9px; border-radius: 7px; background: #fff0e1; color: #9f4913; font-size: var(--font-note); font-weight: 500; }
 .note-subject-field { margin-top: 18px; }

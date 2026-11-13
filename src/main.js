@@ -13,7 +13,7 @@ const fmt = (date, options) => new Intl.DateTimeFormat('ru-RU', options).format(
 const shortDate = key => fmt(new Date(key + 'T12:00:00'), { day: 'numeric', month: 'long' });
 const plural = (n, one, few, many) => `${n} ${n % 100 >= 11 && n % 100 <= 14 ? many : n % 10 === 1 ? one : n % 10 >= 2 && n % 10 <= 4 ? few : many}`;
 const externalIcon = '<svg class="inline-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M7 17 17 7M7 7h10v10"/></svg>';
-const noteIcon = '<svg class="inline-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5"/></svg>';
+const noteIcon = '<svg class="inline-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 0 1 4 4L7 21H3v-4ZM15 5l4 4"/></svg>';
 const logoURL = new URL('../assets/school-emblem.svg', import.meta.url).href;
 const brandHTML = () => `<img class="school-emblem" src="${logoURL}" alt="Герб школы" width="48" height="48"><span class="brand-copy"><span>Школьное расписание</span><span class="school-name">ЗилАрт 548</span></span>`;
 const CACHE_KEY = `school-replacements-v${REPLACEMENT_DATA_VERSION}`;
@@ -305,8 +305,9 @@ function lessonHTML(number, items, changes) {
   content += changes.filter(row => !shown.has(row)).map(replacementHTML).join('');
   const subjects = uniqueNoteSubjects([...items.map(item => item.subject), ...changes.map(row => row.subject || row.originalSubject)]);
   const saved = subjects.map(subject => ({ subject, text: getSubjectNote(notes, className, subject) })).filter(note => note.text);
-  const noteArea = `<div class="lesson-note-area">${saved.map(note => `<div class="subject-note"><span class="subject-note-label">${subjects.length > 1 ? esc(note.subject) : 'Заметка'}</span><p class="subject-note-text">${esc(note.text)}</p></div>`).join('')}<button id="lesson-note-${number}" class="note-button ${saved.length ? 'has-note' : ''}" type="button" data-note-subjects="${esc(JSON.stringify(subjects))}" aria-haspopup="dialog" aria-controls="note-dialog" aria-label="Заметка к уроку ${number}" ${subjects.length ? '' : 'disabled'}>${noteIcon} Заметка</button></div>`;
-  return `<article class="lesson ${changes.length ? 'changed' : ''}"><div class="lesson-time"><strong>${esc(bell.start)}</strong><span>${esc(bell.end)}</span></div><div class="lesson-number">${number}</div><div class="lesson-content">${content}${noteArea}</div></article>`;
+  const noteButton = `<button id="lesson-note-${number}" class="note-button ${saved.length ? 'has-note' : ''}" type="button" data-note-subjects="${esc(JSON.stringify(subjects))}" aria-haspopup="dialog" aria-controls="note-dialog" aria-label="Заметка к уроку ${number}" title="${saved.length ? 'Изменить заметку' : 'Заметка'}" ${subjects.length ? '' : 'disabled'}>${noteIcon}</button>`;
+  const noteArea = saved.length ? `<div class="lesson-note-area">${saved.map(note => `<div class="subject-note">${subjects.length > 1 ? `<span class="subject-note-label">${esc(note.subject)}</span>` : ''}<p class="subject-note-text">${esc(note.text)}</p></div>`).join('')}</div>` : '';
+  return `<article class="lesson ${changes.length ? 'changed' : ''}"><div class="lesson-time"><strong>${esc(bell.start)}</strong><span>${esc(bell.end)}</span></div><div class="lesson-number">${number}</div><div class="lesson-content">${noteButton}${content}${noteArea}</div></article>`;
 }
 
 async function importFile(event) {
