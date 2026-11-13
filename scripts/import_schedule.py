@@ -152,9 +152,23 @@ def import_schedule(path):
         for key, lesson in lessons.items() if key not in placed
         for name, item in lesson_items(lesson, '')
     ]
-    return {
+    source_revision = hashlib.sha256(raw).hexdigest()
+    applied = []
+    correction_path = Path(__file__).resolve().parent.parent / 'data' / 'schedule-corrections.json'
+    if correction_path.exists():
+        corrections = json.loads(correction_path.read_text(encoding='utf-8'))
+        if corrections.get('sourceRevision') == source_revision:
+            for correction in corrections.get('ignoreUnscheduled', []):
+                matches = [item for item in unscheduled if all(item[key] == correction[key] for key in ('className', 'subject', 'teacher'))]
+                confirmed = timetable.get(correction['className'], {}).get(str(correction['confirmedDay']), {}).get(str(correction['confirmedLesson']), [])
+                if len(matches) != 1 or not any(item['subject'] == correction['subject'] and item['teacher'] == correction['confirmedTeacher'] for item in confirmed):
+                    raise ValueError('Подтверждённое уточнение не совпадает с XML. Нужна проверка исходных данных.')
+                unscheduled.remove(matches[0])
+                applied.append(correction)
+    revision = source_revision if not applied else hashlib.sha256((source_revision + json.dumps(applied, ensure_ascii=False, sort_keys=True)).encode('utf-8')).hexdigest()
+    result = {
         'source': path.name, 'format': 'aSc Timetables XML',
-        'revision': hashlib.sha256(raw).hexdigest(),
+        'sourceRevision': source_revision, 'revision': revision,
         'classes': timetable, 'bells': bells,
         'notes': [
             'Предметы, учителя и подгруппы перенесены напрямую из XML aSc Timetables.',
@@ -167,9 +181,14 @@ def import_schedule(path):
             'classes': len(timetable), 'lessonDefinitions': len(lessons),
             'sourceCards': card_count, 'scheduledLessons': len(placed),
             'entries': entries, 'slots': sum(len(slots) for class_days in timetable.values() for slots in class_days.values()),
-            'unscheduledLessons': len(lessons) - len(placed),
+            'unscheduledLessons': len(lessons) - len(placed) - len(applied),
         },
     }
+    if applied:
+        result['corrections'] = applied
+        result['stats']['ignoredUnscheduledLessons'] = len(applied)
+        result['notes'].append('Подтверждено пользователем: у 6Е «Разговоры о важном» ведёт Котнов К.В. по понедельникам первым уроком, кабинет 3.39. Лишняя неназначенная запись с Поповой Ю.Н. исключена.')
+    return result
 
 
 if __name__ == '__main__':

@@ -55,12 +55,14 @@ test('even a newer manual cache for an old timetable cannot hide corrected subje
   await expect(page.locator('.class-badge')).toHaveText('6М');
 });
 
-test('the one unplaced lesson is visible for its class without inventing a day or lesson number', async ({ page }) => {
+test('6Е has one confirmed Monday lesson with Kotnov and no obsolete unplaced warning', async ({ page }) => {
   await page.goto('./');
   await chooseClass(page, '6Е');
-  await expect(page.locator('.unscheduled')).toContainText('Разговоры о важном (ВД)');
-  await expect(page.locator('.unscheduled')).toContainText('Попова Ю.Н.');
-  await expect(page.locator('.unscheduled')).toContainText('не назначены день и номер урока');
-  await chooseClass(page, '6М');
   await expect(page.locator('.unscheduled')).toHaveCount(0);
+  await selectMonth(page, '2026-11');
+  await page.locator('#calendar-day-2026-11-09').click();
+  await expect(lesson(page, 1).locator('.original')).toHaveCount(1);
+  await expect(lesson(page, 1).locator('.original h3')).toHaveText('Разговоры о важном (ВД)');
+  await expect(lesson(page, 1).locator('.original p')).toContainText('Котнов К.В. · Каб. 3.39');
+  await expect(lesson(page, 4).locator('.original p')).toContainText('Попова Ю.Н.');
 });

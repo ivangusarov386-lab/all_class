@@ -1,6 +1,8 @@
 import { EXPORT_URL, SHEET_URL, REPLACEMENT_DATA_VERSION, readReplacementWorkbook, teacherKey, isReplacementDatasetForSchedule } from './replacements.js?v=4';
 import { dateKey, monthKey, dateInMonth, shiftMonth, monthGrid, monthOptions } from './calendar.js';
 import { readClassCookie, rememberClass, forgetClass } from './profile.js';
+import { NOTES_STORAGE_KEY, loadSubjectNotes, getSubjectNote, uniqueNoteSubjects } from './notes.js';
+import { SubjectNoteEditor } from './note-editor.js';
 
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -11,6 +13,7 @@ const fmt = (date, options) => new Intl.DateTimeFormat('ru-RU', options).format(
 const shortDate = key => fmt(new Date(key + 'T12:00:00'), { day: 'numeric', month: 'long' });
 const plural = (n, one, few, many) => `${n} ${n % 100 >= 11 && n % 100 <= 14 ? many : n % 10 === 1 ? one : n % 10 >= 2 && n % 10 <= 4 ? few : many}`;
 const externalIcon = '<svg class="inline-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M7 17 17 7M7 7h10v10"/></svg>';
+const noteIcon = '<svg class="inline-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5"/></svg>';
 const logoURL = new URL('../assets/school-emblem.svg', import.meta.url).href;
 const brandHTML = () => `<img class="school-emblem" src="${logoURL}" alt="Герб школы" width="48" height="48"><span class="brand-copy"><span>Школьное расписание</span><span class="school-name">ЗилАрт 548</span></span>`;
 const CACHE_KEY = `school-replacements-v${REPLACEMENT_DATA_VERSION}`;
@@ -19,6 +22,8 @@ let selected = today(), calendarOpen = false, data, snapshot = empty(), replacem
 let className = '', setupGrade = '', setupClass = '', preferenceNotice = '';
 let origin = 'snapshot', busy = false, failure = '', importMessage = '';
 let sourcesUnlocked = false;
+let notes = loadSubjectNotes();
+const noteEditor = new SubjectNoteEditor({ getNotes: () => notes, onSaved: value => { notes = value; }, onRender: () => render() });
 const validDataset = value => isReplacementDatasetForSchedule(value, data);
 
 function move(days) { selected.setDate(selected.getDate() + days); render(); }
@@ -105,6 +110,7 @@ function resetClass() {
   try { localStorage.removeItem('school-class'); } catch {}
   className = ''; setupGrade = ''; setupClass = ''; preferenceNotice = '';
   sourcesUnlocked = false;
+  noteEditor.dismiss();
   selected = today(); calendarOpen = false;
   render();
   window.scrollTo({ top: 0, behavior: 'instant' });
@@ -125,6 +131,7 @@ function render() {
     return;
   }
   const dialogOpen = $('#source-dialog')?.open;
+  noteEditor.captureFocus();
   const accessOpen = $('#access-dialog')?.open;
   const passwordValue = $('#source-password')?.value || '';
   const passwordError = $('#password-error')?.textContent || '';
@@ -211,7 +218,9 @@ function render() {
       <button id="clear" class="danger-button">Сбросить локальный импорт</button>
       ${review.length ? `<details class="source-review"><summary>Записи для проверки: ${esc(className)} и строки без класса (${review.length})</summary><p class="small">Показаны последние ${Math.min(30, review.length)} записей. Исправьте исходную строку в Google Таблице и обновите замены.</p><ul>${review.slice(0, 30).map(row => `<li><strong>${row.date ? shortDate(row.date) : 'Без даты'} · ${esc(row.sourceClass)}${row.lesson ? ' · ' + row.lesson + ' урок' : ''}</strong><span>${esc(row.subject || row.originalSubject)} · ${esc(row.teacher)}</span><span>${esc(row.reason)}</span><small>${esc(row.source?.sheet)} · строка ${esc(row.source?.row)}</small></li>`).join('')}</ul></details>` : ''}
       <details><summary>Особенности исходных таблиц</summary>${data.notes.map(note => `<p class="small">${esc(note)}</p>`).join('')}<p class="small">Даты берутся из строк, а не из названия листа. Повторы удаляются. При замене одной подгруппы зачёркивается только её учитель. Если кабинет не заполнен в таблице замен, приложение не подставляет его автоматически.</p></details>
-    </dialog>` : ''}`;
+    </dialog>` : ''}
+    ${noteEditor.html()}`;
+  document.querySelectorAll('[data-note-subjects]').forEach(button => button.onclick = () => noteEditor.open(className, JSON.parse(button.dataset.noteSubjects), button.id));
   document.querySelectorAll('[data-date]').forEach(button => button.onclick = () => selectDate(button.dataset.date));
   $('#month-select').onchange = event => changeMonth(event.target.value);
   $('#toggle-calendar').onclick = () => { calendarOpen = true; render(); };
@@ -265,6 +274,7 @@ function render() {
   let touch;
   $('.calendar').addEventListener('touchstart', event => { touch = event.changedTouches[0]; }, { passive: true });
   $('.calendar').addEventListener('touchend', event => { const point = event.changedTouches[0]; if (touch && Math.abs(point.clientX - touch.clientX) > 70 && Math.abs(point.clientY - touch.clientY) < 60) { const direction = point.clientX < touch.clientX ? 1 : -1; if (calendarOpen) moveMonth(direction); else move(direction); } }, { passive: true });
+  if (noteEditor.isOpen) { noteEditor.mount(); return; }
   if (calendarOpen) $('#calendar-dialog').showModal();
   else if (accessOpen) {
     $('#source-password').value = passwordValue;
@@ -293,7 +303,10 @@ function lessonHTML(number, items, changes) {
     return `${labels}<div class="original ${matching.length ? 'crossed' : ''}"><h3>${esc(item.subject)}</h3><p>${esc(item.teacher)} · ${item.room ? 'Каб. ' + esc(item.room) : 'Кабинет не указан'}${groups}</p></div>`;
   }).join('');
   content += changes.filter(row => !shown.has(row)).map(replacementHTML).join('');
-  return `<article class="lesson ${changes.length ? 'changed' : ''}"><div class="lesson-time"><strong>${esc(bell.start)}</strong><span>${esc(bell.end)}</span></div><div class="lesson-number">${number}</div><div class="lesson-content">${content}</div></article>`;
+  const subjects = uniqueNoteSubjects([...items.map(item => item.subject), ...changes.map(row => row.subject || row.originalSubject)]);
+  const saved = subjects.map(subject => ({ subject, text: getSubjectNote(notes, className, subject) })).filter(note => note.text);
+  const noteArea = `<div class="lesson-note-area">${saved.map(note => `<div class="subject-note"><span class="subject-note-label">${subjects.length > 1 ? esc(note.subject) : 'Заметка'}</span><p class="subject-note-text">${esc(note.text)}</p></div>`).join('')}<button id="lesson-note-${number}" class="note-button ${saved.length ? 'has-note' : ''}" type="button" data-note-subjects="${esc(JSON.stringify(subjects))}" aria-haspopup="dialog" aria-controls="note-dialog" aria-label="Заметка к уроку ${number}" ${subjects.length ? '' : 'disabled'}>${noteIcon} Заметка</button></div>`;
+  return `<article class="lesson ${changes.length ? 'changed' : ''}"><div class="lesson-time"><strong>${esc(bell.start)}</strong><span>${esc(bell.end)}</span></div><div class="lesson-number">${number}</div><div class="lesson-content">${content}${noteArea}</div></article>`;
 }
 
 async function importFile(event) {
@@ -351,4 +364,9 @@ async function init() {
     $('#app').innerHTML = '<main class="load-error"><h1>Не удалось загрузить расписание</h1><p>Проверьте подключение и обновите страницу.</p><button onclick="location.reload()">Повторить</button></main>';
   }
 }
+window.addEventListener('storage', event => {
+  if (event.key !== NOTES_STORAGE_KEY && event.key !== null) return;
+  notes = loadSubjectNotes(); noteEditor.refreshUneditedDrafts();
+  if (data) render();
+});
 init();

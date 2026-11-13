@@ -454,3 +454,30 @@ dialog.class-setup::backdrop { background: #fff2e2b8; backdrop-filter: blur(4px)
   .setup-fields select { font-size: 0.9375rem; }
   footer > span { min-width: 0; }
 }
+
+.lesson-note-area { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 10px; min-width: 0; }
+.note-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 5px 10px; border: 1px solid #efd3bb; border-radius: 8px; background: #fff9f3; color: #a34210; font-size: var(--font-note); font-weight: 500; }
+.note-button.has-note { background: #ffedda; border-color: #eab481; }
+.note-button:hover { background: #ffe8d2; }
+.subject-note { width: 100%; padding: 9px 12px; border: 1px solid #f0d7b6; border-left: 3px solid #e48b32; border-radius: 8px; background: #fff8e9; }
+.subject-note-label { display: block; color: #9d5b14; font-size: var(--font-note); font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.lesson .subject-note-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; margin-top: 4px; color: #5c4938; font-size: var(--font-small); line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+dialog.note-dialog { max-width: 520px; max-height: calc(100dvh - 24px); padding: 26px; }
+.note-class { display: inline-block; margin-top: 14px; padding: 4px 9px; border-radius: 7px; background: #fff0e1; color: #9f4913; font-size: var(--font-note); font-weight: 500; }
+.note-subject-field { margin-top: 18px; }
+.note-dialog .note-current-subject { margin: 16px 0 12px; color: var(--ink); font-size: 1rem; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.note-dialog textarea { display: block; width: 100%; min-height: 170px; max-height: 45dvh; padding: 14px; border: 1px solid #dfc2a6; border-radius: 12px; resize: vertical; background: linear-gradient(#fffefb, #fffaf0); color: var(--ink); font: inherit; font-size: 1rem; line-height: 1.65; }
+.note-dialog textarea::placeholder { color: #99816e; }
+.note-dialog textarea:focus-visible { outline: 3px solid #c94b0b; outline-offset: 3px; }
+.note-dialog .note-help { margin: 12px 0; font-size: var(--font-note); line-height: 1.65; }
+.note-dialog .note-error { margin: 10px 0; color: #a32937; font-size: var(--font-small); }
+.note-dialog .note-message { margin: 10px 0; color: #6e602f; font-size: var(--font-small); }
+.note-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 8px 12px; position: sticky; bottom: -26px; padding: 12px 0 4px; background: #fffdfb; }
+.note-actions .setup-submit { min-height: 44px; }
+.note-actions .text-button { min-height: 44px; }
+.delete-note { grid-column: 1 / -1; justify-self: start; min-height: 36px; padding: 6px 0; background: none; color: #a32937; font-size: var(--font-small); }
+.delete-note:hover { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 680px) {
+  dialog.note-dialog { padding: 20px; }
+  .note-actions { bottom: -20px; }
+}

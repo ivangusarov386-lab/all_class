@@ -65,7 +65,7 @@ test('invalid references, out-of-range cards and alternating weeks cannot overwr
   }
 });
 
-test('the published timetable retains the corrected XML subjects, classrooms and explicitly unplaced lesson', () => {
+test('the published timetable retains XML subjects and classrooms and the confirmed 6Е lesson with Kotnov', () => {
   const data = JSON.parse(fs.readFileSync('data/schedule.json'));
   assert.equal(data.source, 'от 031126_1212.xml');
   assert.equal(data.format, 'aSc Timetables XML');
@@ -77,5 +77,10 @@ test('the published timetable retains the corrected XML subjects, classrooms and
   assert.deepEqual(thursday['3'][0], { subject: 'Изобразительное искусство', teacher: 'Машицына Е.А.', room: '4.15', groups: [], shared: false });
   assert.deepEqual(thursday['5'].map(item => item.groups), [['1'], ['2']]);
   assert.equal(data.classes['5А']['0']['1'][0].subject, 'Разговоры о важном (ВД)');
-  assert.deepEqual(data.unscheduled, [{ className: '6Е', subject: 'Разговоры о важном (ВД)', teacher: 'Попова Ю.Н.', room: '', groups: [], shared: false }]);
+  assert.deepEqual(data.unscheduled, []);
+  assert.deepEqual(data.classes['6Е']['0']['1'], [{ subject: 'Разговоры о важном (ВД)', teacher: 'Котнов К.В.', room: '3.39', groups: [], shared: true }]);
+  assert.equal(data.classes['6З']['0']['1'][0].teacher, 'Котнов К.В.');
+  assert.equal(data.classes['6Е']['0']['4'][0].teacher, 'Попова Ю.Н.');
+  assert.equal(data.stats.ignoredUnscheduledLessons, 1);
+  assert.notEqual(data.revision, data.sourceRevision);
 });

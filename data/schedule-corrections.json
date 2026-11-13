@@ -1,0 +1,13 @@
+{
+  "sourceRevision": "c3a424874a463dd484be6fef253e08e94e93e85545aa15c839605f59521c14df",
+  "ignoreUnscheduled": [
+    {
+      "className": "6Е",
+      "subject": "Разговоры о важном (ВД)",
+      "teacher": "Попова Ю.Н.",
+      "confirmedDay": 0,
+      "confirmedLesson": 1,
+      "confirmedTeacher": "Котнов К.В."
+    }
+  ]
+}
