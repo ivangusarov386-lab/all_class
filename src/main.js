@@ -22,6 +22,7 @@ let selected = today(), calendarOpen = false, data, snapshot = empty(), replacem
 let className = '', setupGrade = '', setupClass = '', preferenceNotice = '';
 let origin = 'snapshot', busy = false, failure = '', importMessage = '';
 let sourcesUnlocked = false;
+let interfaceReady = false;
 let notes = loadSubjectNotes();
 const noteEditor = new SubjectNoteEditor({ getNotes: () => notes, onSaved: value => { notes = value; }, onRender: () => render() });
 const validDataset = value => isReplacementDatasetForSchedule(value, data);
@@ -123,6 +124,7 @@ function syncStatus() {
 }
 
 function render() {
+  if (!interfaceReady) return;
   const classes = Object.keys(data.classes).sort((a, b) => parseInt(a) - parseInt(b) || a.localeCompare(b, 'ru'));
   if (!classes.includes(className)) {
     className = '';
@@ -335,7 +337,7 @@ async function sync({ quiet = false } = {}) {
   finally { busy = false; render(); }
 }
 
-async function init() {
+export async function init({ beforeRender = Promise.resolve() } = {}) {
   try {
     const response = await fetch(new URL('../data/schedule.json', import.meta.url), { cache: 'no-store' });
     if (!response.ok) throw Error();
@@ -358,10 +360,13 @@ async function init() {
     if (validDataset(cached) && (cached.origin === 'file' || (Date.parse(cached.fetchedAt) || 0) > (Date.parse(snapshot.fetchedAt) || 0))) {
       replacements = cached; origin = cached.origin === 'file' ? 'file' : 'google';
     } else replacements = snapshot;
+    await beforeRender;
+    interfaceReady = true;
     render();
     sync({ quiet: true });
     setInterval(() => { if (!document.hidden) sync({ quiet: true }); }, 5 * 60 * 1000);
   } catch {
+    await beforeRender;
     $('#app').innerHTML = '<main class="load-error"><h1>Не удалось загрузить расписание</h1><p>Проверьте подключение и обновите страницу.</p><button onclick="location.reload()">Повторить</button></main>';
   }
 }
@@ -370,4 +375,3 @@ window.addEventListener('storage', event => {
   notes = loadSubjectNotes(); noteEditor.refreshUneditedDrafts();
   if (data) render();
 });
-init();

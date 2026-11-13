@@ -11,9 +11,14 @@
       .startup { max-width: 620px; margin: 15vh auto; padding: 24px; line-height: 1.6; }
       .startup a { color: #bd4509; }
     </style>
-    <link rel="stylesheet" href="./src/style.css?v=11">
+    <link rel="stylesheet" href="./src/style.css?v=12">
   </head>
   <body>
+    <section id="opening-intro" class="opening-intro" aria-label="Заставка ЗилАрт 548" hidden>
+      <video id="opening-video" autoplay muted playsinline preload="auto" disablepictureinpicture aria-hidden="true"></video>
+      <div class="opening-brand"><span>ЗилАрт 548</span><span>Школьное расписание</span></div>
+      <button id="skip-opening" class="opening-skip" type="button" aria-label="Пропустить анимацию">Пропустить <span aria-hidden="true">→</span></button>
+    </section>
     <div id="app">
       <main class="startup" role="status">
         <h1>Школьное расписание</h1>
@@ -21,6 +26,6 @@
         <noscript><p>Включите JavaScript в браузере, чтобы выбрать класс и день.</p></noscript>
       </main>
     </div>
-    <script type="module" src="./src/startup.js?v=11"></script>
+    <script type="module" src="./src/startup.js?v=12"></script>
   </body>
 </html>
