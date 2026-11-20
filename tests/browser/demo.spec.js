@@ -15,8 +15,8 @@ test('9Ц lesson cards share a peach surface with blue МЦКО and green Ста
   await expect(page.locator('.event-statgrad')).toHaveCount(2);
   await expect(page.locator('.demo-lesson')).toHaveCount(7);
   for (const card of await page.locator('.demo-lesson').all()) {
-    await expect(card).toHaveCSS('background-color', 'rgb(255, 240, 226)');
-    await expect(card).toHaveCSS('border-top-color', 'rgb(237, 208, 183)');
+    await expect(card).toHaveCSS('background-color', 'rgb(243, 192, 139)');
+    await expect(card).toHaveCSS('border-top-color', 'rgb(197, 138, 80)');
   }
   await expect(page.locator('.demo-lesson:not(.event-card)').first()).toHaveCSS('border-left-color', 'rgba(0, 0, 0, 0)');
   await expect(page.locator('.event-mcko').first().locator('.replacement p')).toHaveText('Кабинет 2.41');
@@ -59,5 +59,5 @@ test('a real 9Ц replacement has a red side indicator and contains only the subs
   await expect(card.locator('.replacement p')).toHaveText('Шляпугина Т.А.');
   await expect(card).not.toContainText('Науменко И.М.');
   await expect(card).toHaveCSS('border-left-color', 'rgb(220, 38, 38)');
-  await expect(card).toHaveCSS('background-color', 'rgb(255, 240, 226)');
+  await expect(card).toHaveCSS('background-color', 'rgb(243, 192, 139)');
 });
