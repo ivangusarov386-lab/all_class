@@ -1,0 +1,73 @@
+.demo-badge {
+  flex-shrink: 0;
+  padding: 6px 11px;
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  background: #fff8f0;
+  color: var(--accent);
+  font-size: var(--font-note);
+  font-weight: 600;
+}
+.gto-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin: 0 0 28px;
+  padding: 24px 28px;
+  border: 1px solid #efb47e;
+  border-radius: 20px;
+  background: radial-gradient(ellipse at 12% 0%, #ffffffc9, transparent 56%), linear-gradient(110deg, #fff0d9, #ffd09e);
+  box-shadow: inset 0 2px 0 #ffffffd9, 0 4px 0 #e8b78e, 0 12px 25px #a54b1012;
+}
+.gto-emblem {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 76px;
+  height: 84px;
+  color: var(--accent);
+}
+.gto-emblem svg { width: 64px; height: 64px; }
+.gto-copy { min-width: 0; flex: 1; }
+.gto-eyebrow { color: #87502d; font-size: var(--font-small); font-weight: 600; }
+.gto-copy h2 { margin-top: 4px; color: var(--ink); font-size: 1.5rem; font-weight: 700; line-height: 1.3; }
+.gto-copy p { margin-top: 7px; color: #76503a; font-size: var(--font-small); line-height: 1.5; }
+.gto-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 11px 16px;
+  border: 1px solid #983607;
+  border-radius: 12px;
+  background: linear-gradient(140deg, #c24a10, #a93b07);
+  color: #fff;
+  font-size: var(--font-small);
+  font-weight: 600;
+  line-height: 1.5;
+  text-decoration: none;
+  box-shadow: inset 0 1px 0 #ffcb9d66, 0 3px 0 #873107, 0 5px 9px #94390b20;
+}
+.gto-link svg { width: 16px; height: 16px; }
+.gto-link:hover { background: #9c3507; }
+.gto-link:active { box-shadow: inset 0 2px 4px #74290533, 0 1px 0 #873107; }
+.lesson.event-card { margin: 12px 0; padding: 20px 14px; border: 1px solid var(--event-border); border-left: 5px solid var(--event-border); border-radius: 14px; background: var(--event-background); color: var(--event-ink); }
+.event-replacement { --event-background: linear-gradient(120deg, #fee2e2, #fecaca); --event-border: #dc2626; --event-ink: #8d1521; }
+.event-mcko { --event-background: linear-gradient(120deg, #e0edff, #bfdbfe); --event-border: #2563eb; --event-ink: #16428d; }
+.event-statgrad { --event-background: linear-gradient(120deg, #e0f8e9, #bbf7d0); --event-border: #15803d; --event-ink: #14532d; }
+.event-card .replacement, .event-card .replacement p, .event-card .lesson-time > span, .event-card .note-button { color: var(--event-ink); }
+.event-card .lesson-number { color: var(--event-ink); border-color: var(--event-border); background: #ffffff80; }
+.event-card .crossed, .event-card .crossed p { color: var(--event-ink); }
+.event-card .crossed { opacity: 0.75; }
+@media (max-width: 680px) {
+  .demo-badge { padding: 5px 9px; }
+  .gto-banner { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 12px 16px; padding: 20px; margin-bottom: 24px; border-radius: 18px; }
+  .gto-emblem { width: 52px; height: 64px; }
+  .gto-emblem svg { width: 52px; height: 52px; }
+  .gto-copy h2 { font-size: 1.25rem; }
+  .gto-copy p { margin-top: 6px; }
+  .gto-link { grid-column: 1 / -1; width: 100%; }
+}

@@ -3,6 +3,7 @@ import { dateKey, monthKey, dateInMonth, shiftMonth, monthGrid, monthOptions } f
 import { readClassCookie, rememberClass, forgetClass } from './profile.js';
 import { NOTES_STORAGE_KEY, loadSubjectNotes, getSubjectNote, uniqueNoteSubjects } from './notes.js';
 import { SubjectNoteEditor } from './note-editor.js';
+import { DEMO_CLASS, DEMO_DATE, withDemoReplacements, gtoBannerHTML, lessonEventType } from './demo.js';
 
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -140,8 +141,9 @@ function render() {
   const focused = document.activeElement?.id;
   const sourceMonths = [...new Set([...replacements.coverage.map(key => key.slice(0, 7)), ...(replacements.sheetReports || []).map(report => report.declaredMonth).filter(Boolean)])];
   const months = monthOptions(today(), selected, sourceMonths);
+  const viewEntries = withDemoReplacements(replacements.entries, data);
   const dayCounts = new Map();
-  for (const [name, rows] of [['changes', replacements.entries], ['pending', replacements.unresolved]]) {
+  for (const [name, rows] of [['changes', viewEntries], ['pending', replacements.unresolved]]) {
     for (const row of rows) {
       if (row.className !== className || !row.date) continue;
       if (!dayCounts.has(row.date)) dayCounts.set(row.date, { changes: 0, pending: 0 });
@@ -150,7 +152,7 @@ function render() {
   }
   const key = dateKey(selected), isToday = key === dateKey(today()), day = (selected.getDay() + 6) % 7;
   const slots = data.classes[className][String(day)] || {};
-  const changes = replacements.entries.filter(row => row.className === className && row.date === key);
+  const changes = viewEntries.filter(row => row.className === className && row.date === key);
   const pending = replacements.unresolved.filter(row => row.className === className && row.date === key);
   const numbers = [...new Set([...Object.keys(slots).map(Number), ...changes.map(row => row.lesson)])].sort((a, b) => a - b);
   const relevantDates = [...replacements.entries, ...replacements.unresolved].filter(row => row.className === className && row.date).map(row => row.date).sort();
@@ -158,17 +160,20 @@ function render() {
   const review = replacements.unresolved.filter(row => row.className === className || !row.className).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const unscheduled = (data.unscheduled || []).filter(row => row.className === className);
   const week = new Date(selected); week.setDate(week.getDate() - day);
-  const coverageNote = !replacements.coverage.includes(key)
+  const demoDay = className === DEMO_CLASS && key === DEMO_DATE;
+  const coverageNote = demoDay ? '' : !replacements.coverage.includes(key)
     ? `На ${shortDate(key)} в таблице пока нет записей замен. Показано основное расписание.`
     : !changes.length && !pending.length ? `Для ${className} на этот день замен в таблице не указано.` : '';
-  const badge = changes.length ? plural(changes.length, 'замена', 'замены', 'замен') : pending.length ? 'Есть записи для проверки' : 'Базовое расписание';
+  const badge = demoDay ? plural(changes.length, 'изменение', 'изменения', 'изменений') : changes.length ? plural(changes.length, 'замена', 'замены', 'замен') : pending.length ? 'Есть записи для проверки' : 'Базовое расписание';
   $('#app').innerHTML = `
     <div class="page">
       <header class="topbar">
         <a href="./" class="brand">${brandHTML()}</a>
+        ${className === DEMO_CLASS ? '<span class="demo-badge">Демо-версия</span>' : ''}
       </header>
       <main>
         <section class="hero"><div class="class-badge" aria-label="Выбранный класс ${esc(className)}">${esc(className)}</div><div class="hero-copy"><p>Все уроки под рукой</p><h1 id="class-profile-heading" tabindex="-1">Твой учебный день.</h1><p class="subtitle">Расписание твоего класса с учётом замен.</p></div></section>
+        ${gtoBannerHTML(className)}
         <section class="calendar">
           <div class="calendar-toolbar"><div class="field month-field"><label class="sr-only" for="month-select">Месяц расписания</label><select id="month-select">${monthOptionsHTML(months)}</select></div></div>
           <div class="calendar-heading"><div><h2>${isToday ? 'Сегодня' : esc(fmt(selected, { weekday: 'long' }))}<span class="date-label">${shortDate(key)}</span></h2></div><div class="day-controls"><button id="today">Сегодня</button><button id="prev" aria-label="Предыдущий день">←</button><button id="next" aria-label="Следующий день">→</button></div></div>
@@ -184,7 +189,7 @@ function render() {
           <div class="lessons" id="lessons">${numbers.length ? numbers.map(number => lessonHTML(number, slots[String(number)] || [], changes.filter(row => row.lesson === number))).join('') : `<div class="empty"><span aria-hidden="true">☀</span><h3>${day === 6 ? 'Воскресенье. Можно выдохнуть.' : 'На этот день уроков нет'}</h3><p>В исходном расписании занятия не указаны.</p><button id="next-school">Следующий учебный день</button></div>`}</div>
           <div class="sync-bar"><div><span class="status-dot ${failure ? '' : 'loaded'}"></span><span id="sync-status" role="status">${esc(syncStatus())}</span></div><button id="refresh" ${busy ? 'disabled' : ''}>${busy ? 'Загрузка…' : '↻ Обновить замены'}</button></div>
         </section>
-        <p class="source-note">Красным — замена, зачёркнуто — исходное занятие.${latest ? ' Последние записи в таблице: ' + shortDate(latest) + '.' : ''}<br>Время уроков — московское. Смахните влево или вправо, чтобы сменить день.</p>
+        <p class="source-note">${className === DEMO_CLASS ? 'Красным — замена, синим — МЦКО, зелёным — СтатГрад.' : 'Красным — замена, зачёркнуто — исходное занятие.'}${latest ? ' Последние записи в таблице: ' + shortDate(latest) + '.' : ''}<br>Время уроков — московское. Смахните влево или вправо, чтобы сменить день.</p>
         ${preferenceNotice ? `<p class="preference-notice" role="status">${esc(preferenceNotice)}</p>` : ''}
         <footer><span>Учиться проще, когда всё по порядку.</span><div class="footer-actions"><button class="text-button" id="details">Для сотрудников</button><button class="reset-class" id="reset-class" type="button">Сбросить класс</button></div></footer>
       </main>
@@ -291,7 +296,9 @@ function render() {
 }
 
 function replacementHTML(row) {
+  if (row.demo) return `<div class="replacement demo-replacement"><span class="replacement-label">${row.eventType === 'mcko' ? 'МЦКО' : 'СтатГрад'}</span><h3>${esc(row.subject)}</h3>${row.room ? `<p>Кабинет ${esc(row.room)}</p>` : ''}</div>`;
   if (row.cancelled) return `<div class="replacement"><span class="replacement-label">Отмена</span><h3>Урок отменён</h3><p>${esc(row.subject || row.originalSubject)}</p></div>`;
+  if (className === DEMO_CLASS) return `<div class="replacement"><span class="replacement-label">Замена</span><h3>${esc(row.subject || row.originalSubject || 'Предмет не указан')}</h3><p>${esc(row.teacher || 'Учитель не указан')}</p></div>`;
   const sourceMismatch = row.originalTeacher && row.targetTeachers.length && !row.targetTeachers.some(name => teacherKey(name) === teacherKey(row.originalTeacher));
   return `<div class="replacement"><span class="replacement-label">${row.addedLesson ? 'Занятие из таблицы замен' : 'Замена'}</span><h3>${esc(row.subject || row.originalSubject || 'Предмет не указан')}</h3><p>${esc(row.teacher || 'Учитель не указан')} · ${row.room ? 'Каб. ' + esc(row.room) : 'Кабинет не указан в заменах'}</p>${row.inferredLesson ? '<small>Номер урока определён по основному расписанию</small>' : ''}${sourceMismatch ? `<small>В таблице: вместо ${esc(row.originalTeacher)}</small>` : ''}</div>`;
 }
@@ -301,6 +308,7 @@ function lessonHTML(number, items, changes) {
   let content = items.map(item => {
     const matching = changes.filter(row => row.targetTeachers.includes(item.teacher));
     const labels = matching.filter(row => !shown.has(row)).map(row => { shown.add(row); return replacementHTML(row); }).join('');
+    if (className === DEMO_CLASS && matching.length && matching.every(row => !row.demo && !row.cancelled)) return labels;
     const groups = item.groups?.length ? ` · ${item.groups.length > 1 ? 'Группы' : 'Группа'} ${esc(item.groups.join(', '))}` : '';
     return `${labels}<div class="original ${matching.length ? 'crossed' : ''}"><h3>${esc(item.subject)}</h3><p>${esc(item.teacher)} · ${item.room ? 'Каб. ' + esc(item.room) : 'Кабинет не указан'}${groups}</p></div>`;
   }).join('');
@@ -309,7 +317,8 @@ function lessonHTML(number, items, changes) {
   const saved = subjects.map(subject => ({ subject, text: getSubjectNote(notes, className, subject) })).filter(note => note.text);
   const noteButton = `<button id="lesson-note-${number}" class="note-button ${saved.length ? 'has-note' : ''}" type="button" data-note-subjects="${esc(JSON.stringify(subjects))}" aria-haspopup="dialog" aria-controls="note-dialog" aria-label="Заметка к уроку ${number}" title="${saved.length ? 'Изменить заметку' : 'Заметка'}" ${subjects.length ? '' : 'disabled'}>${noteIcon}</button>`;
   const noteArea = saved.length ? `<div class="lesson-note-area">${saved.map(note => `<div class="subject-note">${subjects.length > 1 ? `<span class="subject-note-label">${esc(note.subject)}</span>` : ''}<p class="subject-note-text">${esc(note.text)}</p></div>`).join('')}</div>` : '';
-  return `<article class="lesson ${changes.length ? 'changed' : ''}"><div class="lesson-time"><strong>${esc(bell.start)}</strong><span>${esc(bell.end)}</span></div><div class="lesson-number">${number}</div><div class="lesson-content">${noteButton}${content}${noteArea}</div></article>`;
+  const kind = lessonEventType(className, changes);
+  return `<article class="lesson ${changes.length ? 'changed' : ''} ${kind ? `event-card event-${kind}` : ''}"><div class="lesson-time"><strong>${esc(bell.start)}</strong><span>${esc(bell.end)}</span></div><div class="lesson-number">${number}</div><div class="lesson-content">${noteButton}${content}${noteArea}</div></article>`;
 }
 
 async function importFile(event) {

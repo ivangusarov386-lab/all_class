@@ -36,7 +36,7 @@ test('opens under the repository path with no build server or external dependenc
   await expect(page.locator('.lesson').first()).toBeVisible();
 });
 
-test('imports a replacement from the local browser module and retains the original lesson', async ({ page }) => {
+test('imports a replacement and shows only the substitute for 9Ц', async ({ page }) => {
   await page.goto('./');
   await openSources(page);
   await expect(page.locator('a[download]')).toHaveAttribute('href', /replacement-template|data:text\/csv/);
@@ -46,8 +46,10 @@ test('imports a replacement from the local browser module and retains the origin
     buffer: Buffer.from('Дата;Класс;Урок;Предмет;Учитель;Кабинет\n11.11.2026;9Ц;3;Проверка замены;Тестовый учитель;2.40\n'),
   });
   await expect(page.locator('.replacement h3')).toHaveText('Проверка замены');
-  await expect(page.locator('.changed .crossed h3')).toHaveText('Физика');
-  await expect(page.locator('.changed .crossed h3')).toHaveCSS('text-decoration-line', 'line-through');
+  await expect(page.locator('.event-replacement')).toHaveCount(1);
+  await expect(page.locator('.event-replacement .replacement-label')).toHaveText('Замена');
+  await expect(page.locator('.event-replacement .replacement p')).toHaveText('Тестовый учитель');
+  await expect(page.locator('.event-replacement .original')).toHaveCount(0);
   await page.reload();
   await expect(page.locator('.replacement h3')).toHaveText('Проверка замены');
   await openSources(page);
@@ -73,17 +75,18 @@ test('shows a useful message if the app module fails to load', async ({ page }) 
 });
 
 
-test('bundled school replacements survive an unavailable Google connection and only strike the replaced subgroup', async ({ page }) => {
+test('bundled 9Ц replacements hide replaced teachers and retain unaffected subgroups', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-09-25T09:00:00Z'));
   await page.goto('./');
   await expect(page.locator('.coverage-note')).toHaveCount(0);
   const third = page.locator('.lesson').filter({ has: page.locator('.lesson-number', { hasText: /^3$/ }) });
   await expect(third.locator('.replacement h3')).toHaveText('Информатика');
   await expect(third.locator('.replacement p')).toContainText('Харисова Е.А.');
-  await expect(third.locator('.crossed p')).toContainText('Путилкина Н.П.');
+  await expect(third).not.toContainText('Путилкина Н.П.');
+  await expect(third).toHaveClass(/event-replacement/);
   const seventh = page.locator('.lesson').filter({ has: page.locator('.lesson-number', { hasText: /^7$/ }) });
   await expect(seventh.locator('.original').filter({ hasText: 'Вереина О.К.' })).not.toHaveClass(/crossed/);
-  await expect(seventh.locator('.original').filter({ hasText: 'Саакян М.А.' })).toHaveClass(/crossed/);
+  await expect(seventh).not.toContainText('Саакян М.А.');
   await expect(page.locator('#sync-status')).toContainText('Не удалось обновить');
   await expect(page.locator('img[alt="Герб школы"]')).toBeVisible();
   await expect.poll(() => page.locator('img[alt="Герб школы"]').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
