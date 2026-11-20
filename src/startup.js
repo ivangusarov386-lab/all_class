@@ -67,7 +67,7 @@ catch {
 }
 
 // Load code and timetable data while the intro plays; display the app after it.
-import('./main.js?v=13-demo').then(module => module.init({ beforeRender: opening.finished })).catch(error => {
+import('./main.js?v=14-demo').then(module => module.init({ beforeRender: opening.finished })).catch(error => {
   opening.dismiss();
   console.error('Unable to start school timetable:', error);
   document.getElementById('app').innerHTML = `

@@ -308,7 +308,8 @@ function lessonHTML(number, items, changes) {
   let content = items.map(item => {
     const matching = changes.filter(row => row.targetTeachers.includes(item.teacher));
     const labels = matching.filter(row => !shown.has(row)).map(row => { shown.add(row); return replacementHTML(row); }).join('');
-    if (className === DEMO_CLASS && matching.length && matching.every(row => !row.demo && !row.cancelled)) return labels;
+    // The current event replaces the covered content in 9Ц, including exams.
+    if (className === DEMO_CLASS && matching.length) return labels;
     const groups = item.groups?.length ? ` · ${item.groups.length > 1 ? 'Группы' : 'Группа'} ${esc(item.groups.join(', '))}` : '';
     return `${labels}<div class="original ${matching.length ? 'crossed' : ''}"><h3>${esc(item.subject)}</h3><p>${esc(item.teacher)} · ${item.room ? 'Каб. ' + esc(item.room) : 'Кабинет не указан'}${groups}</p></div>`;
   }).join('');

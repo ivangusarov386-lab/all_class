@@ -16,7 +16,12 @@ test('9Ц has two blue МЦКО cards and two green СтатГрад cards on No
   await expect(page.locator('.event-mcko').first().locator('.replacement p')).toHaveText('Кабинет 2.41');
   await expect(page.locator('.event-mcko').first()).toHaveCSS('border-left-color', 'rgb(37, 99, 235)');
   await expect(page.locator('.event-statgrad').first()).toHaveCSS('border-left-color', 'rgb(21, 128, 61)');
-  await expect(page.locator('.event-statgrad').first().locator('.crossed')).toHaveCount(2);
+  await expect(page.locator('.event-card .original, .event-card .crossed')).toHaveCount(0);
+  await expect(page.locator('.event-mcko').first()).not.toContainText('Белова С.В.');
+  await expect(page.locator('.event-statgrad').first()).not.toContainText('Путилкина Н.П.');
+  await expect(page.locator('.event-statgrad').first()).not.toContainText('Харисова Е.А.');
+  const third = page.locator('.lesson').filter({ has: page.locator('.lesson-number', { hasText: /^3$/ }) });
+  await expect(third.locator('.original')).toHaveCount(2);
   await expect(page.locator('[id^="lesson-note-"]')).toHaveCount(7);
   for (const width of [320, 390, 1280]) {
     await page.setViewportSize({ width, height: 900 });
