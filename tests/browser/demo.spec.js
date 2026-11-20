@@ -7,12 +7,18 @@ test.beforeEach(async ({ page, baseURL }) => {
   await page.route('https://docs.google.com/spreadsheets/d/**/export?format=xlsx', route => route.abort('internetdisconnected'));
 });
 
-test('9Ц has two blue МЦКО cards and two green СтатГрад cards on November 20 only', async ({ page }) => {
+test('9Ц lesson cards share a peach surface with blue МЦКО and green СтатГрад side indicators', async ({ page }) => {
   await page.goto('./');
   await expect(page.locator('.gto-banner')).toBeVisible();
   await expect(page.locator('.change-tag')).toHaveText('4 изменения');
   await expect(page.locator('.event-mcko')).toHaveCount(2);
   await expect(page.locator('.event-statgrad')).toHaveCount(2);
+  await expect(page.locator('.demo-lesson')).toHaveCount(7);
+  for (const card of await page.locator('.demo-lesson').all()) {
+    await expect(card).toHaveCSS('background-color', 'rgb(255, 240, 226)');
+    await expect(card).toHaveCSS('border-top-color', 'rgb(237, 208, 183)');
+  }
+  await expect(page.locator('.demo-lesson:not(.event-card)').first()).toHaveCSS('border-left-color', 'rgba(0, 0, 0, 0)');
   await expect(page.locator('.event-mcko').first().locator('.replacement p')).toHaveText('Кабинет 2.41');
   await expect(page.locator('.event-mcko').first()).toHaveCSS('border-left-color', 'rgb(37, 99, 235)');
   await expect(page.locator('.event-statgrad').first()).toHaveCSS('border-left-color', 'rgb(21, 128, 61)');
@@ -40,11 +46,11 @@ test('other classes keep their original layout without demo events or the GTO ba
   await page.goto('./');
   for (const name of ['9А', '10Я', '6М']) {
     await chooseClass(page, name);
-    await expect(page.locator('.demo-badge, .gto-banner, .event-card, .demo-replacement')).toHaveCount(0);
+    await expect(page.locator('.demo-badge, .gto-banner, .demo-lesson, .event-card, .demo-replacement')).toHaveCount(0);
   }
 });
 
-test('a real 9Ц replacement is red and contains the substitute without the replaced teacher', async ({ page }) => {
+test('a real 9Ц replacement has a red side indicator and contains only the substitute', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-09-21T09:00:00Z'));
   await page.goto('./');
   const card = page.locator('.event-replacement').filter({ hasText: 'Шляпугина Т.А.' });
@@ -53,4 +59,5 @@ test('a real 9Ц replacement is red and contains the substitute without the repl
   await expect(card.locator('.replacement p')).toHaveText('Шляпугина Т.А.');
   await expect(card).not.toContainText('Науменко И.М.');
   await expect(card).toHaveCSS('border-left-color', 'rgb(220, 38, 38)');
+  await expect(card).toHaveCSS('background-color', 'rgb(255, 240, 226)');
 });

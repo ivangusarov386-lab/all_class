@@ -319,7 +319,7 @@ function lessonHTML(number, items, changes) {
   const noteButton = `<button id="lesson-note-${number}" class="note-button ${saved.length ? 'has-note' : ''}" type="button" data-note-subjects="${esc(JSON.stringify(subjects))}" aria-haspopup="dialog" aria-controls="note-dialog" aria-label="Заметка к уроку ${number}" title="${saved.length ? 'Изменить заметку' : 'Заметка'}" ${subjects.length ? '' : 'disabled'}>${noteIcon}</button>`;
   const noteArea = saved.length ? `<div class="lesson-note-area">${saved.map(note => `<div class="subject-note">${subjects.length > 1 ? `<span class="subject-note-label">${esc(note.subject)}</span>` : ''}<p class="subject-note-text">${esc(note.text)}</p></div>`).join('')}</div>` : '';
   const kind = lessonEventType(className, changes);
-  return `<article class="lesson ${changes.length ? 'changed' : ''} ${kind ? `event-card event-${kind}` : ''}"><div class="lesson-time"><strong>${esc(bell.start)}</strong><span>${esc(bell.end)}</span></div><div class="lesson-number">${number}</div><div class="lesson-content">${noteButton}${content}${noteArea}</div></article>`;
+  return `<article class="lesson ${className === DEMO_CLASS ? 'demo-lesson' : ''} ${changes.length ? 'changed' : ''} ${kind ? `event-card event-${kind}` : ''}"><div class="lesson-time"><strong>${esc(bell.start)}</strong><span>${esc(bell.end)}</span></div><div class="lesson-number">${number}</div><div class="lesson-content">${noteButton}${content}${noteArea}</div></article>`;
 }
 
 async function importFile(event) {
