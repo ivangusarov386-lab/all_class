@@ -54,14 +54,14 @@
 .gto-link svg { width: 16px; height: 16px; }
 .gto-link:hover { background: #9c3507; }
 .gto-link:active { box-shadow: inset 0 2px 4px #74290533, 0 1px 0 #873107; }
-.lesson.demo-lesson { margin: 12px 0; padding: 20px 14px; border: 1px solid #c58a50; border-left: 5px solid transparent; border-radius: 14px; background: #f3c08b; color: var(--ink); box-shadow: 0 3px 0 #d8a170, 0 6px 12px #98531c14; }
-.lesson.demo-lesson.event-card { border-left-color: var(--event-indicator); }
-.event-replacement { --event-indicator: #dc2626; }
-.event-mcko { --event-indicator: #2563eb; }
-.event-statgrad { --event-indicator: #15803d; }
-.demo-lesson .replacement { color: var(--ink); }
-.demo-lesson .replacement p, .demo-lesson .original p, .demo-lesson .lesson-time > span { color: #62462e; }
-.demo-lesson .lesson-number { color: #8a4c25; border-color: #e4b78f; background: #fff8f0; }
+.lesson.event-card { margin: 12px 0; padding: 20px 14px; border: 1px solid var(--event-border); border-left: 5px solid var(--event-border); border-radius: 14px; background: var(--event-background); color: var(--event-ink); }
+.event-replacement { --event-background: linear-gradient(120deg, #fee2e2, #fecaca); --event-border: #dc2626; --event-ink: #8d1521; }
+.event-mcko { --event-background: linear-gradient(120deg, #e0edff, #bfdbfe); --event-border: #2563eb; --event-ink: #16428d; }
+.event-statgrad { --event-background: linear-gradient(120deg, #e0f8e9, #bbf7d0); --event-border: #15803d; --event-ink: #14532d; }
+.event-card .replacement, .event-card .replacement p, .event-card .lesson-time > span, .event-card .note-button { color: var(--event-ink); }
+.event-card .lesson-number { color: var(--event-ink); border-color: var(--event-border); background: #ffffff80; }
+.event-card .crossed, .event-card .crossed p { color: var(--event-ink); }
+.event-card .crossed { opacity: 0.75; }
 @media (max-width: 680px) {
   .demo-badge { padding: 5px 9px; }
   .gto-banner { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 12px 16px; padding: 20px; margin-bottom: 24px; border-radius: 18px; }
