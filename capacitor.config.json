@@ -1,0 +1,12 @@
+{
+  "appId": "ru.zilart548.allclass",
+  "appName": "All-Class",
+  "webDir": "dist",
+  "server": {
+    "hostname": "localhost",
+    "androidScheme": "https"
+  },
+  "android": {
+    "minWebViewVersion": 108
+  }
+}

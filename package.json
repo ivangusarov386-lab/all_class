@@ -10,12 +10,18 @@
     "test": "node --test tests/*.test.js",
     "vendor:refresh": "node scripts/refresh_vendor.mjs",
     "test:browser": "playwright test",
-    "sync:replacements": "node --use-env-proxy scripts/sync_replacements.mjs"
+    "sync:replacements": "node --use-env-proxy scripts/sync_replacements.mjs",
+    "android:sync": "npm run build && cap sync android",
+    "android:open": "cap open android",
+    "android:debug": "npm run android:sync && cd android && ./gradlew --no-daemon assembleDebug"
   },
   "dependencies": {
+    "@capacitor/android": "8.6.2",
+    "@capacitor/core": "8.6.2",
     "xlsx": "0.18.5"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.6.2",
     "@playwright/test": "^1.65.0",
     "vite": "^7.2.2"
   }

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">All-Class</string>
+    <string name="title_activity_main">All-Class</string>
+    <string name="package_name">ru.zilart548.allclass</string>
+    <string name="custom_url_scheme">ru.zilart548.allclass</string>
+</resources>
