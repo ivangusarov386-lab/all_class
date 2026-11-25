@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/app-test.js';
 import fs from 'node:fs';
 import { rememberTestClass, chooseClass } from '../fixtures/class-profile.js';
 import { selectMonth, openSources } from '../fixtures/ui.js';

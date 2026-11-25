@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/app-test.js';
 import { rememberTestClass } from '../fixtures/class-profile.js';
 import { missingReplacementWorkbook } from '../fixtures/missing-replacement.js';
 

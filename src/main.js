@@ -3,6 +3,7 @@ import { dateKey, monthKey, dateInMonth, shiftMonth, monthGrid, monthOptions } f
 import { readClassCookie, rememberClass, forgetClass } from './profile.js';
 import { NOTES_STORAGE_KEY, loadSubjectNotes, getSubjectNote, uniqueNoteSubjects } from './notes.js';
 import { SubjectNoteEditor } from './note-editor.js';
+import { appLock } from './app-lock.js';
 import { DEMO_CLASS, DEMO_DATE, withDemoReplacements, gtoBannerHTML, lessonEventType } from './demo.js';
 
 const $ = selector => document.querySelector(selector);
@@ -191,7 +192,7 @@ function render() {
         </section>
         <p class="source-note">${className === DEMO_CLASS ? 'Красным — замена, синим — МЦКО, зелёным — СтатГрад.' : 'Красным — замена, зачёркнуто — исходное занятие.'}${latest ? ' Последние записи в таблице: ' + shortDate(latest) + '.' : ''}<br>Время уроков — московское. Смахните влево или вправо, чтобы сменить день.</p>
         ${preferenceNotice ? `<p class="preference-notice" role="status">${esc(preferenceNotice)}</p>` : ''}
-        <footer><span>Учиться проще, когда всё по порядку.</span><div class="footer-actions"><button class="text-button" id="details">Для сотрудников</button><button class="reset-class" id="reset-class" type="button">Сбросить класс</button></div></footer>
+        <footer><span>Учиться проще, когда всё по порядку.</span><div class="footer-actions"><button class="text-button" id="details">Для сотрудников</button><button class="text-button" id="entry-settings" type="button">Пароль входа</button><button class="reset-class" id="reset-class" type="button">Сбросить класс</button></div></footer>
       </main>
     </div>
     <dialog id="calendar-dialog" class="calendar-dialog" aria-labelledby="calendar-title" aria-describedby="calendar-description">
@@ -277,6 +278,7 @@ function render() {
     $('#clear').onclick = () => { replacements = snapshot; origin = 'snapshot'; failure = ''; save(CACHE_KEY, null); importMessage = 'Локальный импорт сброшен. Показана школьная таблица.'; render(); };
   }
   $('#reset-class').onclick = resetClass;
+  $('#entry-settings').onclick = () => appLock.settings();
   $('#refresh').onclick = () => sync();
   let touch;
   $('.calendar').addEventListener('touchstart', event => { touch = event.changedTouches[0]; }, { passive: true });

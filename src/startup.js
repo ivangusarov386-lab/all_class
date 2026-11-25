@@ -1,3 +1,5 @@
+import { appLock } from './app-lock.js';
+
 function showOpening() {
   const root = document.getElementById('opening-intro');
   const video = document.getElementById('opening-video');
@@ -67,8 +69,10 @@ catch {
 }
 
 // Load code and timetable data while the intro plays; display the app after it.
-import('./main.js?v=17-demo').then(module => module.init({ beforeRender: opening.finished })).catch(error => {
+const entryReady = opening.finished.then(() => appLock.enter());
+import('./main.js?v=18-demo').then(module => module.init({ beforeRender: entryReady })).catch(error => {
   opening.dismiss();
+  appLock.dismiss();
   console.error('Unable to start school timetable:', error);
   document.getElementById('app').innerHTML = `
     <main class="startup" role="alert">
