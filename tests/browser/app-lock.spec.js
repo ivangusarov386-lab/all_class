@@ -7,87 +7,106 @@ test.beforeEach(async ({ page, baseURL }) => {
   await page.route('https://docs.google.com/spreadsheets/d/**/export?format=xlsx', route => route.abort());
 });
 
-async function setPassword(page, password = 'Школа548!') {
-  await page.locator('#entry-password').fill(password);
-  await page.locator('#entry-confirm').fill(password);
-  await page.locator('#entry-submit').click();
+async function digits(page, code) {
+  for (const digit of code) await page.locator(`[data-pin-digit="${digit}"]`).click();
+}
+async function setPin(page, code = '5480') {
+  await digits(page, code);
+  await expect(page.locator('#entry-title')).toHaveText('Повторите PIN-код');
+  await digits(page, code);
+  await expect(page.locator('.pin-lock')).toHaveCount(0);
+  await expect(page.locator('.class-badge')).toBeVisible();
   await expect(page.locator('.class-badge')).toHaveText('9Ц');
 }
 
-test('first entry offers no password and remembers the choice without changing class or notes', async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 740 });
+test('first entry has an onscreen keypad with no text inputs and remembers opting out', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
   await page.goto('./');
-  await expect(page.locator('#entry-title')).toHaveText('Защитить вход паролем?');
+  await expect(page.locator('#entry-title')).toHaveText('Придумайте PIN-код');
+  await expect(page.locator('[data-pin-digit]')).toHaveCount(10);
+  await expect(page.locator('.pin-lock input')).toHaveCount(0);
   await expect(page.locator('.calendar')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.locator('#entry-without').click();
   await expect(page.locator('.class-badge')).toHaveText('9Ц');
   await page.reload();
   await expect(page.locator('.entry-lock')).toHaveCount(0);
-  await expect(page.locator('.class-badge')).toHaveText('9Ц');
 });
 
-test('password is salted and hashed, reload hides all lessons, wrong passwords and Escape cannot unlock', async ({ page }) => {
-  await page.goto('./');
-  await page.locator('#entry-password').fill('Школа548!');
-  await page.locator('#entry-confirm').fill('Другое');
-  await page.locator('#entry-submit').click();
-  await expect(page.locator('#entry-error')).toHaveText('Пароли не совпадают. Повторите ввод.');
-  await setPassword(page);
+test('PIN confirmation, salted verifier and reload protection work with taps only', async ({ page }) => {
+  await page.goto('./'); await digits(page, '5480'); await digits(page, '1111');
+  await expect(page.locator('#entry-error')).toContainText('не совпадают');
+  await digits(page, '5480'); await expect(page.locator('.class-badge')).toHaveText('9Ц');
   const raw = await page.evaluate(() => localStorage.getItem('all-class-entry-lock-v1'));
   const config = JSON.parse(raw);
-  expect(raw).not.toContain('Школа548!');
-  expect(config.iterations).toBe(600000);
-  expect(config.salt).toMatch(/^[a-f0-9]{32}$/);
-  expect(config.verifier).toMatch(/^[a-f0-9]{64}$/);
-  await page.reload();
-  await expect(page.locator('#entry-title')).toHaveText('Введите пароль');
+  expect(config.input).toBe('pin'); expect(config.length).toBe(4); expect(config.iterations).toBe(600000);
+  expect(config.salt).toMatch(/^[a-f0-9]{32}$/); expect(config.verifier).toMatch(/^[a-f0-9]{64}$/);
+  expect(raw).not.toContain('"5480"');
+  await page.reload(); await expect(page.locator('#entry-title')).toHaveText('Введите PIN-код');
   await expect(page.locator('.calendar')).toHaveCount(0);
-  await page.keyboard.press('Escape');
-  await expect(page.locator('.entry-lock')).toBeVisible();
-  await page.locator('#entry-password').fill('Неверный');
-  await page.locator('#entry-submit').click();
-  await expect(page.locator('#entry-error')).toContainText('Неверный пароль');
+  await expect(page.locator('#entry-without')).toBeHidden();
+  await page.keyboard.press('Escape'); await expect(page.locator('.pin-lock')).toBeVisible();
+  await digits(page, '1111'); await expect(page.locator('#entry-error')).toContainText('Неверный PIN-код');
+  await expect(page.locator('.pin-dots .filled')).toHaveCount(0);
   await expect(page.locator('.calendar')).toHaveCount(0);
-  await page.locator('#entry-password').fill('Школа548!');
-  await page.locator('#entry-submit').click();
-  await expect(page.locator('.class-badge')).toHaveText('9Ц');
+  await digits(page, '5480'); await expect(page.locator('.class-badge')).toHaveText('9Ц');
   await page.locator('#reset-class').click();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('all-class-entry-lock-v1')).mode)).toBe('password');
 });
 
-test('enabling, changing and disabling require the current password and preserve saved notes', async ({ page }) => {
+test('backspace, clear and physical keyboard support the same masked PIN pad', async ({ page }) => {
+  await page.goto('./'); await digits(page, '12'); await expect(page.locator('.pin-dots .filled')).toHaveCount(2);
+  await page.locator('#pin-delete').click(); await expect(page.locator('.pin-dots .filled')).toHaveCount(1);
+  await page.locator('#pin-clear').click(); await expect(page.locator('.pin-dots .filled')).toHaveCount(0);
+  await digits(page, '12');
+  await page.evaluate(() => { const data = new DataTransfer(); data.setData('text', '5480'); document.querySelector('.pin-lock').dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true })); });
+  await expect(page.locator('#entry-title')).toHaveText('Повторите PIN-код');
+  for (const digit of '5480') await page.keyboard.press(digit);
+  await expect(page.locator('.class-badge')).toHaveText('9Ц');
+});
+
+test('changing and disabling authenticate the current PIN and retain notes', async ({ page }) => {
   await page.goto('./'); await page.locator('#entry-without').click();
-  await page.locator('#lesson-note-3').click(); await page.locator('#note-text').fill('Не потерять заметку'); await page.locator('#save-note').click();
-  await page.locator('#entry-settings').click(); await setPassword(page);
-  await page.locator('#entry-settings').click();
-  await page.locator('#entry-current').fill('wrong'); await page.locator('#entry-without').click();
-  await expect(page.locator('#entry-error')).toContainText('Неверный пароль');
-  await page.locator('#entry-current').fill('Школа548!');
-  await page.locator('#entry-password').fill('Новый548!'); await page.locator('#entry-confirm').fill('Новый548!'); await page.locator('#entry-submit').click();
-  await expect(page.locator('.entry-lock')).toHaveCount(0);
-  await page.reload(); await page.locator('#entry-password').fill('Новый548!'); await page.locator('#entry-submit').click();
-  await expect(page.locator('.subject-note-text').first()).toHaveText('Не потерять заметку');
-  await page.locator('#entry-settings').click(); await page.locator('#entry-current').fill('Новый548!'); await page.locator('#entry-without').click();
-  await expect(page.locator('.entry-lock')).toHaveCount(0);
+  await page.locator('#lesson-note-3').click(); await page.locator('#note-text').fill('Сохранённая заметка'); await page.locator('#save-note').click();
+  await page.locator('#entry-settings').click(); await setPin(page);
+  await page.locator('#entry-settings').click(); await digits(page, '1111'); await expect(page.locator('#entry-error')).toContainText('Неверный PIN-код');
+  await expect(page.locator('#entry-without')).toBeHidden();
+  await digits(page, '5480'); await expect(page.locator('#entry-title')).toHaveText('Настройки PIN-кода');
+  await page.locator('#pin-change').click(); await setPin(page, '2468');
+  await page.reload(); await digits(page, '2468'); await expect(page.locator('.subject-note-text').first()).toHaveText('Сохранённая заметка');
+  await page.locator('#entry-settings').click(); await digits(page, '2468'); await expect(page.locator('#entry-without')).toHaveText('Отключить PIN-код');
+  await page.locator('#entry-without').click(); await expect(page.locator('.pin-lock')).toHaveCount(0);
   await page.reload(); await expect(page.locator('.class-badge')).toHaveText('9Ц');
-  await expect(page.locator('.entry-lock')).toHaveCount(0);
 });
 
-test('corrupt records fail closed and failed persistence never claims password protection', async ({ page }) => {
+test('legacy text passwords must be verified once before conversion to PIN', async ({ page }) => {
+  await page.goto('./'); await page.locator('#entry-without').click();
+  await page.evaluate(async () => {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode('Школа548!'), 'PBKDF2', false, ['deriveBits']);
+    const hash = new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 600000 }, key, 256));
+    const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    localStorage.setItem('all-class-entry-lock-v1', JSON.stringify({ version: 1, mode: 'password', salt: hex(salt), verifier: hex(hash), iterations: 600000 }));
+  });
+  await page.reload(); await expect(page.locator('#entry-title')).toHaveText('Введите прежний пароль');
+  await page.locator('#entry-password').fill('wrong'); await page.locator('#entry-submit').click(); await expect(page.locator('#entry-error')).toContainText('Неверный пароль');
+  await expect(page.locator('.calendar')).toHaveCount(0);
+  await page.locator('#entry-password').fill('Школа548!'); await page.locator('#entry-submit').click();
+  await expect(page.locator('#entry-title')).toHaveText('Придумайте PIN-код'); await expect(page.locator('.calendar')).toHaveCount(0);
+  await setPin(page); await page.reload(); await expect(page.locator('#entry-title')).toHaveText('Введите PIN-код');
+  await expect(page.locator('.pin-lock input')).toHaveCount(0); await digits(page, '5480'); await expect(page.locator('.class-badge')).toHaveText('9Ц');
+});
+
+test('corrupt records fail closed', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('all-class-entry-lock-v1', '{broken'));
-  await page.goto('./');
-  await expect(page.locator('#entry-title')).toHaveText('Не удалось прочитать настройки');
+  await page.goto('./'); await expect(page.locator('#entry-title')).toHaveText('Не удалось прочитать настройки');
   await expect(page.locator('.calendar')).toHaveCount(0);
 });
 
-test('blocked writes keep setup open, with an explicit unprotected single-visit option', async ({ page }) => {
+test('failed writes never claim protection and permit an explicit single-visit opt-out', async ({ page }) => {
   await page.addInitScript(() => { Storage.prototype.setItem = () => { throw new DOMException('Blocked', 'SecurityError'); }; });
-  await page.goto('./');
-  await page.locator('#entry-password').fill('Пароль548'); await page.locator('#entry-confirm').fill('Пароль548'); await page.locator('#entry-submit').click();
-  await expect(page.locator('#entry-error')).toBeVisible();
-  await expect(page.locator('.calendar')).toHaveCount(0);
-  await page.locator('#entry-without').click();
-  await expect(page.locator('#entry-once')).toBeVisible(); await page.locator('#entry-once').click();
+  await page.goto('./'); await digits(page, '5480'); await digits(page, '5480');
+  await expect(page.locator('#entry-error')).not.toBeEmpty(); await expect(page.locator('.calendar')).toHaveCount(0);
+  await page.locator('#entry-without').click(); await expect(page.locator('#entry-once')).toBeVisible(); await page.locator('#entry-once').click();
   await expect(page.locator('.class-badge')).toHaveText('9Ц');
 });
