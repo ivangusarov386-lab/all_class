@@ -11,7 +11,7 @@ export class PassesView {
   constructor() {
     this.choice = loadStudent(); this.className = ''; this.active = false;
     this.students = []; this.rosterState = 'idle'; this.rosterError = '';
-    this.passes = []; this.passState = 'idle'; this.passError = ''; this.updatedAt = null;
+    this.passes = []; this.passWarnings = []; this.passState = 'idle'; this.passError = ''; this.updatedAt = null;
     this.timer = null; this.generation = 0;
     document.addEventListener('visibilitychange', () => {
       this.stopPolling();
@@ -47,7 +47,7 @@ export class PassesView {
     if (this.passState === 'loading') this.passState = this.updatedAt ? 'ready' : 'idle';
   }
   clearPasses() {
-    this.cancelPassRequest(); this.passes = []; this.passState = 'idle'; this.passError = ''; this.updatedAt = null;
+    this.cancelPassRequest(); this.passes = []; this.passWarnings = []; this.passState = 'idle'; this.passError = ''; this.updatedAt = null;
   }
   async loadRoster() {
     this.cancelRosterRequest();
@@ -100,10 +100,14 @@ export class PassesView {
     try {
       const result = await passRequest({ action: 'studentPasses', studentId: choice.studentId, className: choice.className }, { signal: controller.signal });
       if (generation !== this.generation || !this.visible()) return;
-      this.passes = studentPasses(result.passes, choice); this.passState = 'ready'; this.updatedAt = new Date();
+      this.passes = studentPasses(result.passes, choice);
+      this.passWarnings = Array.isArray(result.warnings)
+        ? result.warnings.filter(warning => Number.isSafeInteger(warning?.rowNumber) && warning.rowNumber > 1)
+        : [];
+      this.passState = 'ready'; this.updatedAt = new Date();
     } catch (error) {
       if (generation !== this.generation || !this.visible()) return;
-      this.passes = []; this.passState = 'error'; this.passError = networkError(error); this.updatedAt = null;
+      this.passes = []; this.passWarnings = []; this.passState = 'error'; this.passError = networkError(error); this.updatedAt = null;
     } finally {
       clearTimeout(timeout);
       if (generation === this.generation) { this.passAbort = null; this.paintPasses(); }
@@ -148,6 +152,7 @@ export class PassesView {
     panel.innerHTML = `<div class="passes-heading"><div><p class="passes-eyebrow">Выход из школы</p><h2 id="passes-heading">Пропуски</h2><p>${selected ? `${esc(selected.studentName)} · ${esc(this.className)}` : 'Личные пропуски ученика'}</p></div><button id="refresh-passes" type="button" ${!selected || loading || this.rosterState !== 'ready' ? 'disabled' : ''}>${loading ? 'Загрузка…' : 'Обновить'}</button></div>
       <p class="passes-auto">Автообновление каждые 15 секунд, пока раздел открыт.</p>
       <p class="passes-status" role="status" aria-live="polite">${esc(status)}</p>
+      ${this.passWarnings.length ? `<p class="passes-warning" role="status">Некоторые строки пропусков требуют проверки учителем. Строки ${this.passWarnings.map(warning => warning.rowNumber).join(', ')}.</p>` : ''}
       <div class="pass-list" aria-busy="${loading}">${content}</div>`;
     panel.querySelector('#refresh-passes').onclick = () => this.refresh();
   }

@@ -146,3 +146,18 @@ test('polling pauses in a hidden document and resumes with an immediate refresh'
   await expect.poll(() => reads).toBe(2);
   await page.clock.fastForward(15000); await expect.poll(() => reads).toBe(3);
 });
+
+test('valid passes remain visible when the API reports a damaged old row', async ({ page, baseURL }) => {
+  await setup(page, baseURL, route => route.fulfill({
+    json: {
+      ok: true,
+      passes: [makePass()],
+      warnings: [{ rowNumber: 2, message: 'Повреждён или не заполнен QR-код.' }],
+    },
+  }));
+  await open(page);
+  await expect(page.locator('.pass-card')).toHaveCount(1);
+  await expect(page.locator('.passes-warning')).toContainText('Строки 2');
+  await page.selectOption('#student-select', '2');
+  await expect(page.locator('.pass-card')).toHaveCount(0);
+});
