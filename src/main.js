@@ -1,3 +1,4 @@
+import { PassesView } from './passes-view.js';
 import { EXPORT_URL, SHEET_URL, REPLACEMENT_DATA_VERSION, readReplacementWorkbook, teacherKey, isReplacementDatasetForSchedule } from './replacements.js?v=4';
 import { dateKey, monthKey, dateInMonth, shiftMonth, monthGrid, monthOptions } from './calendar.js';
 import { readClassCookie, rememberClass, forgetClass } from './profile.js';
@@ -27,6 +28,7 @@ let sourcesUnlocked = false;
 let interfaceReady = false;
 let notes = loadSubjectNotes();
 const noteEditor = new SubjectNoteEditor({ getNotes: () => notes, onSaved: value => { notes = value; }, onRender: () => render() });
+const passesView = new PassesView();
 const validDataset = value => isReplacementDatasetForSchedule(value, data);
 
 function move(days) { selected.setDate(selected.getDate() + days); render(); }
@@ -109,6 +111,7 @@ function renderClassSetup(classes) {
 }
 
 function resetClass() {
+  passesView.reset();
   forgetClass();
   try { localStorage.removeItem('school-class'); } catch {}
   className = ''; setupGrade = ''; setupClass = ''; preferenceNotice = '';
@@ -175,7 +178,8 @@ function render() {
       <main>
         <section class="hero"><div class="class-badge" aria-label="Выбранный класс ${esc(className)}">${esc(className)}</div><div class="hero-copy"><p>Все уроки под рукой</p><h1 id="class-profile-heading" tabindex="-1">Твой учебный день.</h1><p class="subtitle">Расписание твоего класса с учётом замен.</p></div></section>
         ${gtoBannerHTML(className)}
-        <section class="calendar">
+        <div id="student-area"></div>
+        <section id="schedule-panel" class="calendar">
           <div class="calendar-toolbar"><div class="field month-field"><label class="sr-only" for="month-select">Месяц расписания</label><select id="month-select">${monthOptionsHTML(months)}</select></div></div>
           <div class="calendar-heading"><div><h2>${isToday ? 'Сегодня' : esc(fmt(selected, { weekday: 'long' }))}<span class="date-label">${shortDate(key)}</span></h2></div><div class="day-controls"><button id="today">Сегодня</button><button id="prev" aria-label="Предыдущий день">←</button><button id="next" aria-label="Следующий день">→</button></div></div>
           <div class="week" aria-label="Дни недели">${Array.from({ length: 7 }, (_, index) => {
@@ -228,6 +232,7 @@ function render() {
       <details><summary>Особенности исходных таблиц</summary>${data.notes.map(note => `<p class="small">${esc(note)}</p>`).join('')}<p class="small">Даты берутся из строк, а не из названия листа. Повторы удаляются. При замене одной подгруппы зачёркивается только её учитель. Если кабинет не заполнен в таблице замен, приложение не подставляет его автоматически.</p></details>
     </dialog>` : ''}
     ${noteEditor.html()}`;
+  passesView.mount($('#student-area'), className);
   document.querySelectorAll('[data-note-subjects]').forEach(button => button.onclick = () => noteEditor.open(className, JSON.parse(button.dataset.noteSubjects), button.id));
   document.querySelectorAll('[data-date]').forEach(button => button.onclick = () => selectDate(button.dataset.date));
   $('#month-select').onchange = event => changeMonth(event.target.value);

@@ -9,7 +9,7 @@ test.beforeEach(async ({ page, baseURL }) => {
   await page.route('https://docs.google.com/spreadsheets/d/**/export?format=xlsx', route => route.abort('internetdisconnected'));
 });
 
-test('opens under the repository path with no build server or external dependencies', async ({ page }) => {
+test('opens under the repository path without a build server or external script dependencies', async ({ page }) => {
   const errors = [], responses = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('response', response => responses.push(response));
@@ -20,7 +20,8 @@ test('opens under the repository path with no build server or external dependenc
   expect(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundImage)).not.toBe('none');
   expect(errors).toEqual([]);
   expect(responses.filter(response => response.status() >= 400).map(response => response.url())).toEqual([]);
-  expect(responses.every(response => new URL(response.url()).hostname === '127.0.0.1')).toBe(true);
+  expect(responses.every(response => new URL(response.url()).hostname === '127.0.0.1'
+    || (new URL(response.url()).hostname === 'script.google.com' && response.request().postDataJSON()?.action === 'students'))).toBe(true);
   expect(responses.some(response => /xlsx.*\.(js|mjs)/.test(response.url()))).toBe(false);
 
   await chooseClass(page, '5А');

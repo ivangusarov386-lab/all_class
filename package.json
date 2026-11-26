@@ -13,10 +13,12 @@
     "sync:replacements": "node --use-env-proxy scripts/sync_replacements.mjs"
   },
   "dependencies": {
+    "qrcode-generator": "2.0.4",
     "xlsx": "0.18.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.0",
+    "jsqr": "1.4.0",
     "vite": "^7.2.2"
   }
 }
