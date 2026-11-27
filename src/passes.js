@@ -43,7 +43,10 @@ export function rosterForClass(students, className) {
     && !seen.has(student.studentId) && seen.add(student.studentId))
     .sort((a, b) => a.studentName.localeCompare(b.studentName, 'ru'));
 }
-export function studentPasses(records, student) {
+export function passExpiresAt(pass) {
+  return Date.parse(pass.exitAt) + 30 * 60 * 1000;
+}
+export function studentPasses(records, student, now = Date.now()) {
   if (!Array.isArray(records)) throw new Error('Не удалось прочитать пропуски.');
   const seen = new Set();
   return records.filter(pass => {
@@ -55,6 +58,7 @@ export function studentPasses(records, student) {
       || pass.version !== 1 || pass.type !== 'school-exit-pass' || pass.timeZone !== 'Europe/Moscow'
       || typeof pass.id !== 'string' || !pass.id || typeof pass.studentName !== 'string'
       || !Number.isFinite(Date.parse(pass.exitAt))) throw new Error('Данные пропуска не совпадают с QR-кодом. Обратитесь к учителю.');
+    if (passExpiresAt(pass) <= now) return false;
     if (seen.has(pass.id)) return false;
     seen.add(pass.id); return true;
   }).sort((a, b) => Date.parse(b.exitAt) - Date.parse(a.exitAt) || a.id.localeCompare(b.id));

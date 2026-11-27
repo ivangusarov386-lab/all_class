@@ -13,6 +13,7 @@ function makePass(student = students[0], id = 'd4f0378c-8f03-46f5-8e8c-68d74e61d
   return { ...value, qrPayload: JSON.stringify(value, null, 2) };
 }
 async function setup(page, baseURL, handler) {
+  await page.clock.install({ time: new Date('2026-11-27T11:00:00Z') });
   await rememberTestClass(page, baseURL, '9А');
   await page.route('https://docs.google.com/spreadsheets/d/**/export?format=xlsx', route => route.abort('internetdisconnected'));
   await page.route(endpoint, async route => {
@@ -29,7 +30,6 @@ async function open(page, id = '1') {
 }
 
 test('new teacher pass appears at 15s; foreign ID and class never appear; polling stops on schedule', async ({ page, baseURL }) => {
-  await page.clock.install();
   let records = [], reads = 0;
   await setup(page, baseURL, (route, request) => {
     reads++; expect(request).toEqual({ action: 'studentPasses', studentId: 1, className: '9А' });
@@ -130,7 +130,6 @@ test('roster errors can be retried and classes without students retain their sch
 });
 
 test('polling pauses in a hidden document and resumes with an immediate refresh', async ({ page, baseURL }) => {
-  await page.clock.install();
   let reads = 0;
   await setup(page, baseURL, route => { reads++; return route.fulfill({ json: { ok: true, passes: [] } }); });
   await open(page); await expect.poll(() => reads).toBe(1);
@@ -159,5 +158,23 @@ test('valid passes remain visible when the API reports a damaged old row', async
   await expect(page.locator('.pass-card')).toHaveCount(1);
   await expect(page.locator('.passes-warning')).toContainText('Строки 2');
   await page.selectOption('#student-select', '2');
+  await expect(page.locator('.pass-card')).toHaveCount(0);
+});
+
+
+test('the QR disappears at expiry even while the next refresh is waiting for the network', async ({ page, baseURL }) => {
+  let reads = 0, release;
+  const waiting = new Promise(resolve => { release = resolve; });
+  await setup(page, baseURL, async route => {
+    reads++;
+    if (reads > 1) await waiting;
+    try { await route.fulfill({ json: { ok: true, passes: [makePass()] } }); } catch {}
+  });
+  await open(page);
+  await expect(page.locator('.pass-card')).toHaveCount(1);
+  // The pass exits at 14.30 Moscow, so it expires at 15.00 (12.00 UTC).
+  await page.clock.fastForward(60 * 60 * 1000);
+  await expect(page.locator('.pass-card')).toHaveCount(0);
+  release();
   await expect(page.locator('.pass-card')).toHaveCount(0);
 });

@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import jsQR from 'jsqr';
-import { loadStudent, storeStudent, studentPasses, rosterForClass, passRequest, moscowExit, PASS_ENDPOINT, STUDENT_STORAGE_KEY } from '../src/passes.js';
+import { loadStudent, storeStudent, studentPasses, passExpiresAt, rosterForClass, passRequest, moscowExit, PASS_ENDPOINT, STUDENT_STORAGE_KEY } from '../src/passes.js';
 import { passQR } from '../src/pass-qr.js';
+const TEST_NOW = Date.parse('2026-11-27T11:00:00Z');
 const student = { studentId: 1, studentName: 'Александров Артём', className: '9А' };
 const payload = { version: 1, type: 'school-exit-pass', id: 'd4f0378c-8f03-46f5-8e8c-68d74e61db3a', ...student,
   exitAt: '2026-11-27T14:30:00+03:00', timeZone: 'Europe/Moscow', createdAt: '2026-11-26T18:00:00.000Z' };
@@ -24,11 +25,11 @@ test('roster is restricted to the current class and stable unique IDs', () => {
   assert.deepEqual(rosterForClass([student, student, { ...student, studentId: 2, className: '9Ц' }, { ...student, studentId: '3' }], '9А'), [student]);
 });
 test('passes exclude foreign ID OR class even when the response includes foreign malformed records', () => {
-  assert.deepEqual(studentPasses([pass, pass, { ...pass, studentId: 2, qrPayload: 'bad' }, { ...pass, className: '9Ц' }], student), [pass]);
-  assert.deepEqual(studentPasses([pass], { studentId: 2, className: '9А' }), []);
-  assert.deepEqual(studentPasses([pass], { studentId: 1, className: '9Ц' }), []);
-  assert.throws(() => studentPasses([{ ...pass, id: 'substituted' }], student), /не совпадают/);
-  assert.throws(() => studentPasses([{ ...pass, qrPayload: 'bad' }], student), /Повреждён/);
+  assert.deepEqual(studentPasses([pass, pass, { ...pass, studentId: 2, qrPayload: 'bad' }, { ...pass, className: '9Ц' }], student, TEST_NOW), [pass]);
+  assert.deepEqual(studentPasses([pass], { studentId: 2, className: '9А' }, TEST_NOW), []);
+  assert.deepEqual(studentPasses([pass], { studentId: 1, className: '9Ц' }, TEST_NOW), []);
+  assert.throws(() => studentPasses([{ ...pass, id: 'substituted' }], student, TEST_NOW), /не совпадают/);
+  assert.throws(() => studentPasses([{ ...pass, qrPayload: 'bad' }], student, TEST_NOW), /Повреждён/);
 });
 test('exit time is formatted in Moscow independently of runtime zone', () => {
   assert.equal(moscowExit('2026-11-27T11:30:00Z').time, '14:30');
@@ -68,4 +69,12 @@ test('a browser blocking access to localStorage cannot prevent application start
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('Storage denied'); } });
   try { assert.equal(loadStudent(), null); assert.equal(storeStudent(student), false); }
   finally { if (original) Object.defineProperty(globalThis, 'localStorage', original); else delete globalThis.localStorage; }
+});
+
+
+test('pass expires thirty minutes after scheduled exit, including the exact boundary', () => {
+  assert.equal(passExpiresAt(pass), Date.parse('2026-11-27T12:00:00Z'));
+  assert.deepEqual(studentPasses([pass], student, Date.parse('2026-11-27T11:59:59.999Z')), [pass]);
+  assert.deepEqual(studentPasses([pass], student, Date.parse('2026-11-27T12:00:00Z')), []);
+  assert.deepEqual(studentPasses([pass], student, Date.parse('2026-11-27T12:01:00Z')), []);
 });

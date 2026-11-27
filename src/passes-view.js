@@ -1,4 +1,4 @@
-import { PASS_REFRESH_MS, loadStudent, storeStudent, passRequest, rosterForClass, studentPasses, moscowExit } from './passes.js';
+import { PASS_REFRESH_MS, loadStudent, storeStudent, passRequest, rosterForClass, studentPasses, passExpiresAt, moscowExit } from './passes.js';
 import { passQR } from './pass-qr.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -12,7 +12,7 @@ export class PassesView {
     this.choice = loadStudent(); this.className = ''; this.active = false;
     this.students = []; this.rosterState = 'idle'; this.rosterError = '';
     this.passes = []; this.passWarnings = []; this.passState = 'idle'; this.passError = ''; this.updatedAt = null;
-    this.timer = null; this.generation = 0;
+    this.timer = null; this.expiryTimer = null; this.generation = 0;
     document.addEventListener('visibilitychange', () => {
       this.stopPolling();
       if (this.visible()) { this.refresh(); this.startPolling(); }
@@ -90,7 +90,12 @@ export class PassesView {
       this.timer = setInterval(() => { if (this.visible()) this.refresh(); }, PASS_REFRESH_MS);
     }
   }
-  stopPolling() { clearInterval(this.timer); this.timer = null; }
+  stopPolling() {
+    clearInterval(this.timer);
+    clearTimeout(this.expiryTimer);
+    this.timer = null;
+    this.expiryTimer = null;
+  }
   async refresh() {
     if (!this.visible() || !this.choice || this.rosterState !== 'ready' || this.passAbort) return;
     const controller = new AbortController(); this.passAbort = controller;
@@ -139,8 +144,16 @@ export class PassesView {
     if (focused) this.root.querySelector(`#${focused}`)?.focus({ preventScroll: true });
   }
   paintPasses() {
+    clearTimeout(this.expiryTimer);
+    this.expiryTimer = null;
     const panel = this.root?.querySelector('#passes-panel');
     if (!panel || !this.active) return;
+    this.passes = this.passes.filter(pass => passExpiresAt(pass) > Date.now());
+    if (this.visible() && this.passes.length) {
+      const nextExpiry = Math.min(...this.passes.map(passExpiresAt));
+      const delay = Math.min(Math.max(nextExpiry - Date.now(), 0), 2147483647);
+      this.expiryTimer = setTimeout(() => this.paintPasses(), delay);
+    }
     const selected = this.students.find(student => student.studentId === this.choice?.studentId);
     const loading = this.passState === 'loading';
     let content;
